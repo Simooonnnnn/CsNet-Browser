@@ -7,11 +7,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>CsNet-Icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <None Remove="CsNet-Icon.ico" />
     <None Remove="Resources\CsNet Logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="CsNet-Icon.ico" />
   </ItemGroup>
 
   <ItemGroup>
