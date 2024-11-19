@@ -64,7 +64,7 @@ namespace CsBe_Browser_2._0
                     await WebView.EnsureCoreWebView2Async();
                 }
 
-                if (string.IsNullOrWhiteSpace(query) || query == "Search the Web")
+                if (string.IsNullOrWhiteSpace(query) || query == "Das Web durchsuchen")
                 {
                     MessageBox.Show("Please enter a search query.");
                     return;
@@ -607,26 +607,27 @@ namespace CsBe_Browser_2._0
             WebView.Visibility = Visibility.Visible;
             HomePanel.Visibility = Visibility.Collapsed;
         }
-        public BrowserTab(string title = "New Tab")
+        public BrowserTab(string title = "Neuer Tab")
         {
             Id = Guid.NewGuid().ToString();
             Title = title;
 
+            // Create the close button with fixed positioning
             var closeButton = new Button
             {
                 Content = "×",
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
-                Padding = new Thickness(3),
-                FontSize = 16,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 5, 0),
-                Width = 24,
-                Height = 24,
+                Padding = new Thickness(0),
+                FontSize = 14,
+                Width = 16,
+                Height = 16,
                 Tag = Id,
                 Cursor = Cursors.Hand,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368")),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(4, 0, 10, 5)  // Consistent margins
             };
 
             closeButton.Click += (s, e) =>
@@ -635,51 +636,47 @@ namespace CsBe_Browser_2._0
                 CloseRequested?.Invoke(this, EventArgs.Empty);
             };
 
+            // Create the title block with max width and ellipsis
             var titleBlock = new TextBlock
             {
                 Text = Title,
-                Margin = new Thickness(12, 0, 28, 0),
+                Margin = new Thickness(12, 0, 0, 2),
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 12,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3c4043"))
+                FontSize = 11,
+                FontFamily = new FontFamily("Segoe UI")
             };
 
-            var grid = new Grid();
-            grid.Children.Add(titleBlock);
-            grid.Children.Add(closeButton);
+            // Create container for title and close button
+            var dockPanel = new DockPanel
+            {
+                LastChildFill = true,  // Changed to true to allow title to fill remaining space
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
 
+            // Add close button first, docked to the right
+            dockPanel.Children.Add(closeButton);
+            DockPanel.SetDock(closeButton, Dock.Right);
+
+            // Add title block second, it will fill the remaining space
+            dockPanel.Children.Add(titleBlock);
+
+            // Create the tab button using the XAML style
             TabButton = new Button
             {
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f2f2f2")),
-                BorderThickness = new Thickness(1, 1, 1, 0),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#dedede")),
-                Padding = new Thickness(0, 8, 0, 8),
-                Margin = new Thickness(0, 4, -1, 0),
-                MinWidth = 180,
-                MaxWidth = 220,
-                Height = 36,
-                Content = grid,
+                Style = (Style)Application.Current.FindResource("TabButton"),
+                Content = dockPanel,
                 Tag = Id,
-                Cursor = Cursors.Hand
+                MinWidth = 130,  // Minimum width to ensure close button visibility
+                MaxWidth = 240,  // Maximum width to prevent tabs from getting too large
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
             };
 
-            TabButton.MouseEnter += (s, e) =>
-            {
-                if (!IsSelected)
-                {
-                    TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed"));
-                }
-            };
+            // Mouse enter/leave events
+            TabButton.MouseEnter += (s, e) => { if (!IsSelected) TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")); };
+            TabButton.MouseLeave += (s, e) => { if (!IsSelected) TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ffffff")); };
 
-            TabButton.MouseLeave += (s, e) =>
-            {
-                if (!IsSelected)
-                {
-                    TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f2f2f2"));
-                }
-            };
-
+            // Property changed event
             PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(IsSelected))
@@ -688,38 +685,35 @@ namespace CsBe_Browser_2._0
                 }
             };
 
+            // Initialize WebView and HomePanel
             WebView = new WebView2 { Visibility = Visibility.Collapsed };
             HomePanel = CreateHomePanel();
             HomePanel.Visibility = Visibility.Visible;
 
+            // Navigation completed event
             WebView.NavigationCompleted += (s, e) =>
             {
                 Title = WebView.CoreWebView2.DocumentTitle;
-                ((Grid)TabButton.Content).Children.OfType<TextBlock>().First().Text =
-                    string.IsNullOrEmpty(Title) ? "New Tab" : Title;
+                titleBlock.Text = string.IsNullOrEmpty(Title) ? "Neuer Tab" : Title;
             };
         }
-
         private void UpdateTabAppearance()
         {
             if (IsSelected)
             {
-                TabButton.Background = Brushes.White;
-                TabButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#dadce0"));
-                TabButton.BorderThickness = new Thickness(1, 2, 1, 0);
-                var titleBlock = ((Grid)TabButton.Content).Children.OfType<TextBlock>().First();
+                TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ffffff"));
+                TabButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed"));
+                var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
                 titleBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
             }
             else
             {
-                TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f2f2f2"));
-                TabButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#dedede"));
-                TabButton.BorderThickness = new Thickness(1, 1, 1, 0);
-                var titleBlock = ((Grid)TabButton.Content).Children.OfType<TextBlock>().First();
-                titleBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3c4043"));
+                TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ffffff"));
+                TabButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed"));
+                var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
+                titleBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368"));
             }
         }
-
         private Grid CreateHomePanel()
         {
             var grid = new Grid { Background = Brushes.White };
@@ -763,8 +757,8 @@ namespace CsBe_Browser_2._0
             SearchBox.SetResourceReference(FrameworkElement.StyleProperty, "SearchTextBox");
             SearchBox.Height = 48;
             SearchBox.FontSize = 16;
-            SearchBox.BorderThickness = new Thickness(0);
-            SearchBox.Text = "Search the Web";
+            SearchBox.BorderThickness = new Thickness(1);
+            SearchBox.Text = "Das Web durchsuchen";
             SearchBox.Foreground = Brushes.Gray;
 
             var buttonsPanel = new StackPanel
@@ -810,7 +804,7 @@ namespace CsBe_Browser_2._0
 
         private void SearchBox_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (SearchBox.Text == "Search the Web")
+            if (SearchBox.Text == "Das Web durchsuchen")
             {
                 SearchBox.Text = string.Empty;
                 SearchBox.Foreground = Brushes.Black;
@@ -821,7 +815,7 @@ namespace CsBe_Browser_2._0
         {
             if (string.IsNullOrWhiteSpace(SearchBox.Text))
             {
-                SearchBox.Text = "Search the Web";
+                SearchBox.Text = "Das Web durchsuchen";
                 SearchBox.Foreground = Brushes.Gray;
             }
         }
@@ -831,7 +825,7 @@ namespace CsBe_Browser_2._0
             if (e.Key == Key.Enter)
             {
                 string searchText = SearchBox.Text.Trim();
-                if (!string.IsNullOrWhiteSpace(searchText) && searchText != "Search the Web")
+                if (!string.IsNullOrWhiteSpace(searchText) && searchText != "Das Web durchsuchen")
                 {
                     NavigateToUrl(searchText);
                 }

@@ -187,5 +187,10 @@ namespace CsBe_Browser_2._0
         {
             NavigateToUrl("https://www.csbe.ch");
         }
+
+        private void AddressBar_TextChanged(object sender, TextChangedEventArgs e)
+        {
+
+        }
     }
 }
