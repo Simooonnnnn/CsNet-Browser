@@ -416,16 +416,15 @@ namespace CsBe_Browser_2._0
         {
             var contentHtml = new System.Text.StringBuilder();
 
-            // Extract keywords from content
             var keywords = ExtractKeywords(string.Join(" ", results.ContentBySources.SelectMany(x => x.Value)));
 
             foreach (var source in results.ContentBySources)
             {
                 contentHtml.Append($@"
             <div class='source-section'>
-                <h3>From {WebUtility.HtmlEncode(source.Key)}</h3>
+                <h3>Von {WebUtility.HtmlEncode(source.Key)}</h3>
                 <div class='keywords'>
-                    <h4>Key Points:</h4>
+                    <h4>Kernpunkte:</h4>
                     <ul>
                         {string.Join("\n", source.Value
                                     .SelectMany(text => ExtractBulletPoints(text))
@@ -434,7 +433,7 @@ namespace CsBe_Browser_2._0
                     </ul>
                 </div>
                 <div class='keywords'>
-                    <h4>Keywords:</h4>
+                    <h4>Schlüsselwörter:</h4>
                     <div class='keyword-tags'>{string.Join(" ", keywords.Take(8).Select(k => $"<span class='keyword'>{WebUtility.HtmlEncode(k)}</span>"))}</div>
                 </div>
                 <div class='content'>
@@ -455,16 +454,17 @@ namespace CsBe_Browser_2._0
                 max-width: 800px;
                 margin: 0 auto;
                 background: #fff;
+                color: #000000;
             }}
             h2 {{ 
-                color: #1a73e8;
+                color: #180102;
                 font-size: 1.5em;
                 margin-bottom: 1em;
                 padding-bottom: 0.5em;
                 border-bottom: 2px solid #f0f0f0;
             }}
             h4 {{
-                color: #1a73e8;
+                color: #180102;
                 font-size: 1.1em;
                 margin: 1em 0 0.5em 0;
             }}
@@ -476,7 +476,7 @@ namespace CsBe_Browser_2._0
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             }}
             h3 {{
-                color: #1a73e8;
+                color: #180102;
                 font-size: 1.2em;
                 margin-bottom: 0.5em;
             }}
@@ -492,11 +492,12 @@ namespace CsBe_Browser_2._0
                 gap: 0.5em;
             }}
             .keyword {{
-                background: #e8f0fe;
-                color: #1967d2;
+                background: #f0f0f0;
+                color: #000000;
                 padding: 0.3em 0.8em;
                 border-radius: 1em;
                 font-size: 0.9em;
+                border: 1px solid #d0d0d0;
             }}
             ul {{
                 margin: 0.5em 0;
@@ -504,10 +505,10 @@ namespace CsBe_Browser_2._0
             }}
             li {{
                 margin: 0.3em 0;
-                color: #202124;
+                color: #000000;
             }}
             p {{
-                color: #000;
+                color: #000000;
                 font-size: 1.1em;
                 line-height: 1.8;
                 margin-bottom: 1em;
@@ -515,12 +516,11 @@ namespace CsBe_Browser_2._0
         </style>
     </head>
     <body>
-        <h2>{WebUtility.HtmlEncode(query)}</h2>
+        <h2>Suchergebnisse für: {WebUtility.HtmlEncode(query)}</h2>
         {contentHtml}
     </body>
     </html>";
         }
-
         private List<string> ExtractKeywords(string text)
         {
             var words = text.ToLower()
