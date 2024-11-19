@@ -1,17 +1,23 @@
 ﻿using Microsoft.Web.WebView2.Wpf;
 using System;
+using System.Net.Http;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Linq;
 using System.Windows.Input;
-using System.ComponentModel; // Add this for INotifyPropertyChanged
+using System.ComponentModel;
+using HtmlAgilityPack;
+using System.Collections.Generic;
+using System.Net;
 
 namespace CsBe_Browser_2._0
 {
     public class BrowserTab : INotifyPropertyChanged
     {
+        private readonly HttpClient _httpClient = new HttpClient();
         public string Id { get; }
         public string Title { get; set; }
         public Button TabButton { get; }
@@ -40,13 +46,223 @@ namespace CsBe_Browser_2._0
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+        private async Task PerformCsNetSearch(string query)
+        {
+            try
+            {
+                if (WebView.CoreWebView2 == null)
+                {
+                    await WebView.EnsureCoreWebView2Async();
+                }
 
+                if (string.IsNullOrWhiteSpace(query) || query == "Search the Web")
+                {
+                    MessageBox.Show("Please enter a search query.");
+                    return;
+                }
+
+                _httpClient.DefaultRequestHeaders.Clear();
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+
+                var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
+                var response = await _httpClient.GetStringAsync(searchUrl);
+
+                var doc = new HtmlDocument();
+                doc.LoadHtml(response);
+
+                var links = doc.DocumentNode
+                    .SelectNodes("//div[contains(@class, 'result__body')]//a[@class='result__url']")
+                    ?.Select(a => "https://" + a.InnerText.Trim())
+                    .Where(url => !string.IsNullOrWhiteSpace(url))
+                    .Take(5)
+                    .ToList();
+
+                if (links == null || !links.Any())
+                {
+                    MessageBox.Show("No search results found.");
+                    return;
+                }
+
+                var progressMessage = $@"
+        <html><body style='font-family: Arial; padding: 20px;'>
+            <h2>Analyzing results for: {WebUtility.HtmlEncode(query)}</h2>
+            <p>Please wait...</p>
+        </body></html>";
+                WebView.NavigateToString(progressMessage);
+                WebView.Visibility = Visibility.Visible;
+                HomePanel.Visibility = Visibility.Collapsed;
+
+                var contentPieces = new List<string>();
+                var sources = new HashSet<string>();
+                var keyPoints = new HashSet<string>();
+
+                foreach (var link in links)
+                {
+                    try
+                    {
+                        var pageContent = await _httpClient.GetStringAsync(link);
+                        var pageDoc = new HtmlDocument();
+                        pageDoc.LoadHtml(pageContent);
+
+                        foreach (var node in pageDoc.DocumentNode.SelectNodes("//script|//style")?.ToList() ?? new List<HtmlNode>())
+                        {
+                            node.Remove();
+                        }
+
+                        sources.Add(new Uri(link).Host);
+
+                        // Extract main content paragraphs
+                        var paragraphs = pageDoc.DocumentNode
+                            .SelectNodes("//p[string-length(text()) > 50]|//article//p|//main//p")
+                            ?.Select(node => node.InnerText.Trim())
+                            .Where(text =>
+                                text.Length > 50 &&
+                                text.Length < 500 &&
+                                !text.ToLower().Contains("cookie") &&
+                                !text.ToLower().Contains("copyright") &&
+                                !text.ToLower().Contains("privacy"))
+                            .ToList() ?? new List<string>();
+
+                        // Extract key points from lists
+                        var listItems = pageDoc.DocumentNode
+                            .SelectNodes("//li")
+                            ?.Select(node => node.InnerText.Trim())
+                            .Where(text =>
+                                text.Length > 20 &&
+                                text.Length < 200 &&
+                                !text.ToLower().Contains("cookie"))
+                            .ToList() ?? new List<string>();
+
+                        contentPieces.AddRange(paragraphs);
+                        foreach (var item in listItems)
+                        {
+                            keyPoints.Add(CleanText(item));
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        continue;
+                    }
+                }
+
+                if (!contentPieces.Any())
+                {
+                    MessageBox.Show("Could not extract meaningful information from the sources.");
+                    return;
+                }
+
+                var summary = GenerateSummary(contentPieces);
+                var htmlContent = GenerateFormattedOutput(query, summary, keyPoints, sources);
+                WebView.NavigateToString(htmlContent);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Search error: {ex.Message}");
+            }
+        }
+
+        private string CleanText(string text)
+        {
+            // Remove extra whitespace and special characters
+            text = WebUtility.HtmlDecode(text);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\-\.,:]", " ");
+
+            // Capitalize first letter of sentence
+            text = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(text.ToLower());
+
+            return text.Trim();
+        }
+
+        private string GenerateSummary(List<string> contentPieces)
+        {
+            // Combine similar sentences and create a coherent summary
+            var mainPoints = contentPieces
+                .Select(p => CleanText(p))
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct()
+                .Take(3)
+                .ToList();
+
+            return string.Join("\n\n", mainPoints);
+        }
+
+        private string GenerateFormattedOutput(string query, string summary, HashSet<string> keyPoints, HashSet<string> sources)
+        {
+            var selectedKeyPoints = keyPoints
+                .OrderByDescending(p => p.Length)
+                .Take(5)
+                .ToList();
+
+            return $@"
+    <html>
+    <head>
+        <style>
+            body {{ 
+                font-family: 'Segoe UI', Arial, sans-serif;
+                line-height: 1.6;
+                padding: 2em;
+                max-width: 800px;
+                margin: 0 auto;
+                background: #fff;
+            }}
+            h2 {{ 
+                color: #1a73e8;
+                font-size: 1.5em;
+                margin-bottom: 1em;
+                padding-bottom: 0.5em;
+                border-bottom: 2px solid #f0f0f0;
+            }}
+            .summary {{
+                background: #f8f9fa;
+                padding: 1.5em;
+                border-radius: 8px;
+                margin-bottom: 1em;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                color: #000;
+            }}
+            .key-points {{
+                margin-top: 1.5em;
+                color: #000;
+            }}
+            .key-points ul {{
+                margin: 0;
+                padding-left: 1.5em;
+            }}
+            .key-points li {{
+                margin-bottom: 0.5em;
+            }}
+            .sources {{
+                font-size: 0.9em;
+                color: #666;
+                margin-top: 2em;
+                padding-top: 1em;
+                border-top: 1px solid #eee;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>{WebUtility.HtmlEncode(query)}</h2>
+        <div class='summary'>
+            {WebUtility.HtmlEncode(summary).Replace("\n\n", "<br><br>")}
+        </div>
+        {(selectedKeyPoints.Any() ? $@"
+        <div class='key-points'>
+            <ul>
+                {string.Join("\n", selectedKeyPoints.Select(p => $"<li>{WebUtility.HtmlEncode(p)}</li>"))}
+            </ul>
+        </div>" : "")}
+        <div class='sources'>
+            Sources: {string.Join(", ", sources)}
+        </div>
+    </body>
+    </html>";
+        }
         public BrowserTab(string title = "New Tab")
         {
             Id = Guid.NewGuid().ToString();
             Title = title;
 
-            // Create a more modern close button
             var closeButton = new Button
             {
                 Content = "×",
@@ -70,7 +286,6 @@ namespace CsBe_Browser_2._0
                 CloseRequested?.Invoke(this, EventArgs.Empty);
             };
 
-            // Tab title with better styling
             var titleBlock = new TextBlock
             {
                 Text = Title,
@@ -85,7 +300,6 @@ namespace CsBe_Browser_2._0
             grid.Children.Add(titleBlock);
             grid.Children.Add(closeButton);
 
-            // Modern tab button styling
             TabButton = new Button
             {
                 Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f2f2f2")),
@@ -101,7 +315,6 @@ namespace CsBe_Browser_2._0
                 Cursor = Cursors.Hand
             };
 
-            // Add hover effect
             TabButton.MouseEnter += (s, e) =>
             {
                 if (!IsSelected)
@@ -118,7 +331,6 @@ namespace CsBe_Browser_2._0
                 }
             };
 
-            // Update tab appearance when selected
             PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(IsSelected))
@@ -221,22 +433,22 @@ namespace CsBe_Browser_2._0
             csbeButton.FontSize = 14;
             csbeButton.Margin = new Thickness(0, 0, 15, 0);
 
-            var googleButton = new Button();
-            googleButton.SetResourceReference(FrameworkElement.StyleProperty, "ModernButton");
-            googleButton.Content = "Google Search";
-            googleButton.Width = 160;
-            googleButton.Height = 40;
-            googleButton.FontSize = 14;
+            var csnetButton = new Button();
+            csnetButton.SetResourceReference(FrameworkElement.StyleProperty, "ModernButton");
+            csnetButton.Content = "CsNet Search";
+            csnetButton.Width = 160;
+            csnetButton.Height = 40;
+            csnetButton.FontSize = 14;
 
             SearchBox.GotFocus += SearchBox_GotFocus;
             SearchBox.LostFocus += SearchBox_LostFocus;
             SearchBox.KeyDown += SearchBox_KeyDown;
             csbeButton.Click += (s, e) => NavigateToUrl("https://www.csbe.ch");
-            googleButton.Click += (s, e) => NavigateToUrl("https://www.google.com");
+            csnetButton.Click += async (s, e) => await PerformCsNetSearch(SearchBox.Text);
 
             searchBorder.Child = SearchBox;
             buttonsPanel.Children.Add(csbeButton);
-            buttonsPanel.Children.Add(googleButton);
+            buttonsPanel.Children.Add(csnetButton);
 
             stackPanel.Children.Add(logo);
             stackPanel.Children.Add(searchBorder);
