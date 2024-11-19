@@ -46,6 +46,15 @@ namespace CsBe_Browser_2._0
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+        private string CleanText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            text = WebUtility.HtmlDecode(text);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\.,!?:;\-()]", "");
+            return text.Trim();
+        }
+
         private async Task PerformCsNetSearch(string query)
         {
             try
@@ -64,16 +73,22 @@ namespace CsBe_Browser_2._0
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
-                var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
-                var response = await _httpClient.GetStringAsync(searchUrl);
+                var techTerms = new[] { "apple", "iphone", "ipad", "mac", "macbook", "processor", "chip", "specs", "m1", "m2", "m3" };
+                bool isTechQuery = techTerms.Any(term => query.ToLower().Contains(term));
 
+                var searchUrl = isTechQuery ?
+                    $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}+site:apple.com+OR+site:macrumors.com+OR+site:9to5mac.com+OR+site:theverge.com" :
+                    $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
+
+                var response = await _httpClient.GetStringAsync(searchUrl);
                 var doc = new HtmlDocument();
                 doc.LoadHtml(response);
 
                 var links = doc.DocumentNode
                     .SelectNodes("//div[contains(@class, 'result__body')]//a[@class='result__url']")
                     ?.Select(a => "https://" + a.InnerText.Trim())
-                    .Where(url => !string.IsNullOrWhiteSpace(url))
+                    .Where(url => !string.IsNullOrWhiteSpace(url) &&
+                                 !ContainsUnwantedDomain(url))
                     .Take(5)
                     .ToList();
 
@@ -83,18 +98,10 @@ namespace CsBe_Browser_2._0
                     return;
                 }
 
-                var progressMessage = $@"
-        <html><body style='font-family: Arial; padding: 20px;'>
-            <h2>Analyzing results for: {WebUtility.HtmlEncode(query)}</h2>
-            <p>Please wait...</p>
-        </body></html>";
-                WebView.NavigateToString(progressMessage);
-                WebView.Visibility = Visibility.Visible;
-                HomePanel.Visibility = Visibility.Collapsed;
+                ShowProgressIndicator(query);
 
                 var contentPieces = new List<string>();
                 var sources = new HashSet<string>();
-                var keyPoints = new HashSet<string>();
 
                 foreach (var link in links)
                 {
@@ -104,42 +111,29 @@ namespace CsBe_Browser_2._0
                         var pageDoc = new HtmlDocument();
                         pageDoc.LoadHtml(pageContent);
 
-                        foreach (var node in pageDoc.DocumentNode.SelectNodes("//script|//style")?.ToList() ?? new List<HtmlNode>())
+                        foreach (var node in pageDoc.DocumentNode.SelectNodes("//script|//style|//nav|//header|//footer|//aside|//iframe|//form|//*[contains(@class, 'cookie')]|//*[contains(@class, 'ad')]")?.ToList() ?? new List<HtmlNode>())
                         {
                             node.Remove();
                         }
 
                         sources.Add(new Uri(link).Host);
 
-                        // Extract main content paragraphs
-                        var paragraphs = pageDoc.DocumentNode
-                            .SelectNodes("//p[string-length(text()) > 50]|//article//p|//main//p")
-                            ?.Select(node => node.InnerText.Trim())
-                            .Where(text =>
-                                text.Length > 50 &&
-                                text.Length < 500 &&
-                                !text.ToLower().Contains("cookie") &&
-                                !text.ToLower().Contains("copyright") &&
-                                !text.ToLower().Contains("privacy"))
-                            .ToList() ?? new List<string>();
-
-                        // Extract key points from lists
-                        var listItems = pageDoc.DocumentNode
-                            .SelectNodes("//li")
-                            ?.Select(node => node.InnerText.Trim())
-                            .Where(text =>
-                                text.Length > 20 &&
-                                text.Length < 200 &&
-                                !text.ToLower().Contains("cookie"))
-                            .ToList() ?? new List<string>();
-
-                        contentPieces.AddRange(paragraphs);
-                        foreach (var item in listItems)
+                        var contentNodes = pageDoc.DocumentNode.SelectNodes("//article//p|//main//p|//div[contains(@class, 'content')]//p|//div[contains(@class, 'post')]//p");
+                        if (contentNodes != null)
                         {
-                            keyPoints.Add(CleanText(item));
+                            var paragraphs = contentNodes
+                                .Select(node => CleanText(node.InnerText))
+                                .Where(text =>
+                                    text.Length > 50 &&
+                                    text.Length < 500 &&
+                                    !ContainsUnwantedContent(text) &&
+                                    IsRelevantToQuery(text, query))
+                                .ToList();
+
+                            contentPieces.AddRange(paragraphs);
                         }
                     }
-                    catch (Exception)
+                    catch
                     {
                         continue;
                     }
@@ -151,8 +145,10 @@ namespace CsBe_Browser_2._0
                     return;
                 }
 
-                var summary = GenerateSummary(contentPieces);
-                var htmlContent = GenerateFormattedOutput(query, summary, keyPoints, sources);
+                var results = new SearchResults();
+                results.AddContent(string.Join(", ", sources), contentPieces.Take(4).ToList());
+
+                var htmlContent = GenerateFormattedOutput(query, results);
                 WebView.NavigateToString(htmlContent);
             }
             catch (Exception ex)
@@ -161,38 +157,292 @@ namespace CsBe_Browser_2._0
             }
         }
 
-        private string CleanText(string text)
+        private bool ContainsUnwantedDomain(string url)
         {
-            // Remove extra whitespace and special characters
-            text = WebUtility.HtmlDecode(text);
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\-\.,:]", " ");
+            var unwantedDomains = new[]
+            {
+        "facebook.com", "twitter.com", "instagram.com", "pinterest.com",
+        "linkedin.com", "youtube.com", "reddit.com", "tumblr.com",
+        "microsoft.com/en-us/legal", "privacy", "terms", "cookie"
+    };
 
-            // Capitalize first letter of sentence
-            text = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(text.ToLower());
-
-            return text.Trim();
+            return unwantedDomains.Any(domain => url.Contains(domain));
         }
 
-        private string GenerateSummary(List<string> contentPieces)
+        private bool ContainsUnwantedContent(string text)
         {
-            // Combine similar sentences and create a coherent summary
-            var mainPoints = contentPieces
-                .Select(p => CleanText(p))
-                .Where(p => !string.IsNullOrWhiteSpace(p))
-                .Distinct()
-                .Take(3)
-                .ToList();
+            var unwantedPatterns = new[]
+            {
+        "cookie", "privacy", "copyright", "subscribe", "newsletter",
+        "sign up", "log in", "advertisement", "sponsored", "terms of service",
+        "click here", "read more", "learn more", "accept all cookies",
+        "privacy settings", "cookie settings"
+    };
 
-            return string.Join("\n\n", mainPoints);
+            return text.ToLower().Contains("$") ||
+                   text.Contains("@") ||
+                   unwantedPatterns.Any(pattern => text.ToLower().Contains(pattern));
         }
 
-        private string GenerateFormattedOutput(string query, string summary, HashSet<string> keyPoints, HashSet<string> sources)
+        private bool IsRelevantToQuery(string text, string query)
         {
-            var selectedKeyPoints = keyPoints
-                .OrderByDescending(p => p.Length)
+            var queryWords = query.ToLower().Split(' ', ',', '.').Where(w => w.Length > 2);
+            var textWords = text.ToLower().Split(' ');
+
+            int matchCount = queryWords.Count(queryWord =>
+                textWords.Any(word => word.Contains(queryWord)));
+
+            return matchCount >= 1;
+        }
+        private async Task PerformGeneralSearch(string query)
+        {
+            var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
+            var response = await _httpClient.GetStringAsync(searchUrl);
+            var doc = new HtmlDocument();
+            doc.LoadHtml(response);
+
+            var links = doc.DocumentNode
+                .SelectNodes("//div[contains(@class, 'result__body')]//a[@class='result__url']")
+                ?.Select(a => "https://" + a.InnerText.Trim())
+                .Where(url => !string.IsNullOrWhiteSpace(url))
                 .Take(5)
                 .ToList();
+
+            if (links == null || !links.Any())
+            {
+                MessageBox.Show("No search results found.");
+                return;
+            }
+
+            ShowProgressIndicator(query);
+            var contentAnalyzer = new ContentAnalyzer();
+            var results = await contentAnalyzer.AnalyzeUrls(links, query, _httpClient);
+            var htmlContent = GenerateFormattedOutput(query, results);
+            WebView.NavigateToString(htmlContent);
+        }
+
+        private class ContentAnalyzer
+        {
+            private string CleanText(string text)
+            {
+                if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+
+                text = WebUtility.HtmlDecode(text);
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\.,!?:;\-()]", "");
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"\.(?! )", ". ");
+
+                // Don't convert everything to title case
+                return text.Trim();
+            }
+
+            public async Task<SearchResults> AnalyzeUrls(List<string> urls, string query, HttpClient client)
+            {
+                var results = new SearchResults();
+                var keywordWeights = ExtractKeywords(query);
+                var queryTopics = DetermineQueryTopics(query);
+
+                foreach (var url in urls)
+                {
+                    try
+                    {
+                        var content = await client.GetStringAsync(url);
+                        var doc = new HtmlDocument();
+                        doc.LoadHtml(content);
+
+                        // Remove unnecessary elements
+                        foreach (var node in doc.DocumentNode.SelectNodes("//script|//style|//nav|//header|//footer|//aside|//iframe|//form|//*[contains(@class, 'cookie')]|//*[contains(@class, 'ad')]|//*[contains(@class, 'banner')]")?.ToList() ?? new List<HtmlNode>())
+                        {
+                            node.Remove();
+                        }
+
+                        // Try to find the most relevant content section
+                        var mainContent = doc.DocumentNode.SelectNodes("//article|//main|//div[contains(@class, 'content')]|//div[contains(@class, 'post')]")?.FirstOrDefault()
+                            ?? doc.DocumentNode;
+
+                        var paragraphs = mainContent
+                            .SelectNodes(".//p|.//h1|.//h2|.//h3|.//li[not(ancestor::nav)]")
+                            ?.Select(node => new { Text = CleanText(node.InnerText), Node = node })
+                            .Where(p => IsRelevantContent(p.Text, keywordWeights, queryTopics))
+                            .ToList();
+
+                        if (paragraphs != null && paragraphs.Any())
+                        {
+                            var relevantContent = paragraphs
+                                .OrderByDescending(p => CalculateRelevanceScore(p.Text, keywordWeights, queryTopics))
+                                .Take(3)
+                                .Select(p => p.Text)
+                                .ToList();
+
+                            results.AddContent(new Uri(url).Host, relevantContent);
+                        }
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+
+                return results;
+            }
+
+            private Dictionary<string, double> ExtractKeywords(string query)
+            {
+                var keywords = new Dictionary<string, double>();
+                var words = query.ToLower().Split(new[] { ' ', ',', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var word in words)
+                {
+                    if (word.Length > 2 && !IsStopWord(word))
+                    {
+                        keywords[word] = 1.0;
+
+                        // Add common variations
+                        if (word.EndsWith("s")) keywords[word.TrimEnd('s')] = 0.9;
+                        if (word.EndsWith("es")) keywords[word.Substring(0, word.Length - 2)] = 0.9;
+                        if (word.EndsWith("ing")) keywords[word.Substring(0, word.Length - 3)] = 0.9;
+                        if (word.EndsWith("ed")) keywords[word.Substring(0, word.Length - 2)] = 0.9;
+                    }
+                }
+
+                return keywords;
+            }
+
+            private Dictionary<string, HashSet<string>> DetermineQueryTopics(string query)
+            {
+                return new Dictionary<string, HashSet<string>>
+                {
+                    ["tech"] = new HashSet<string> { "processor", "cpu", "gpu", "ram", "memory", "storage", "battery", "display", "screen", "camera", "chip", "performance", "benchmark" },
+                    ["specs"] = new HashSet<string> { "specifications", "features", "dimensions", "weight", "capacity", "size", "price", "cost" },
+                    ["release"] = new HashSet<string> { "launch", "release", "announce", "debut", "unveil", "reveal" }
+                };
+            }
+
+            private bool IsRelevantContent(string text, Dictionary<string, double> keywords, Dictionary<string, HashSet<string>> topics)
+            {
+                if (string.IsNullOrWhiteSpace(text) || text.Length < 30 || text.Length > 1000)
+                    return false;
+
+                var words = text.ToLower().Split(' ');
+                var keywordCount = words.Count(w => keywords.Keys.Any(k => w.Contains(k)));
+                var topicMatchCount = words.Count(w => topics.Values.Any(topicWords => topicWords.Any(t => w.Contains(t))));
+
+                return (keywordCount >= 1 || topicMatchCount >= 2) && !ContainsUnwantedContent(text);
+            }
+
+            private double CalculateRelevanceScore(string text, Dictionary<string, double> keywords, Dictionary<string, HashSet<string>> topics)
+            {
+                var words = text.ToLower().Split(' ');
+                double score = 0;
+
+                // Keyword matching
+                foreach (var word in words)
+                {
+                    var matchingKeyword = keywords.Keys.FirstOrDefault(k => word.Contains(k));
+                    if (matchingKeyword != null)
+                    {
+                        score += keywords[matchingKeyword] * 2;  // Increase keyword weight
+                    }
+                }
+
+                // Topic matching
+                foreach (var topic in topics)
+                {
+                    foreach (var topicWord in topic.Value)
+                    {
+                        if (words.Any(w => w.Contains(topicWord)))
+                        {
+                            score += 0.5;  // Add topic relevance
+                        }
+                    }
+                }
+
+                // Prefer medium-length, focused paragraphs
+                var lengthScore = Math.Min(1.0, text.Length / 200.0);
+                if (text.Length > 500) lengthScore *= 0.7;  // Penalize very long paragraphs
+
+                return score * lengthScore;
+            }
+
+            private bool ContainsUnwantedContent(string text)
+            {
+                var unwantedPatterns = new[]
+                {
+            "cookie", "privacy", "copyright", "subscribe", "newsletter",
+            "sign up", "log in", "advertisement", "sponsored", "terms of service",
+            "click here", "read more", "learn more"
+        };
+
+                text = text.ToLower();
+                return unwantedPatterns.Any(pattern => text.Contains(pattern)) ||
+                       text.Count(c => c == '$') > 2 ||  // Avoid price-heavy content
+                       text.Count(c => c == '@') > 0;    // Avoid contact information
+            }
+
+            private bool IsStopWord(string word)
+            {
+                var stopWords = new HashSet<string>
+        {
+            "the", "be", "to", "of", "and", "a", "in", "that", "have",
+            "i", "it", "for", "not", "on", "with", "he", "as", "you",
+            "do", "at", "this", "but", "his", "by", "from", "they",
+            "we", "say", "her", "she", "or", "an", "will", "my",
+            "one", "all", "would", "there", "their", "what"
+        };
+
+                return stopWords.Contains(word);
+            }
+        }
+
+        // Rest of the code remains the same (SearchResults class, GenerateFormattedOutput, and ShowProgressIndicator methods)
+        private class SearchResults
+        {
+            public Dictionary<string, List<string>> ContentBySources { get; } = new();
+
+            public void AddContent(string source, List<string> content)
+            {
+                if (ContentBySources.ContainsKey(source))
+                {
+                    ContentBySources[source].AddRange(content);
+                }
+                else
+                {
+                    ContentBySources[source] = content;
+                }
+            }
+        }
+
+        private string GenerateFormattedOutput(string query, SearchResults results)
+        {
+            var contentHtml = new System.Text.StringBuilder();
+
+            // Extract keywords from content
+            var keywords = ExtractKeywords(string.Join(" ", results.ContentBySources.SelectMany(x => x.Value)));
+
+            foreach (var source in results.ContentBySources)
+            {
+                contentHtml.Append($@"
+            <div class='source-section'>
+                <h3>From {WebUtility.HtmlEncode(source.Key)}</h3>
+                <div class='keywords'>
+                    <h4>Key Points:</h4>
+                    <ul>
+                        {string.Join("\n", source.Value
+                                    .SelectMany(text => ExtractBulletPoints(text))
+                                    .Take(5)
+                                    .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
+                    </ul>
+                </div>
+                <div class='keywords'>
+                    <h4>Keywords:</h4>
+                    <div class='keyword-tags'>{string.Join(" ", keywords.Take(8).Select(k => $"<span class='keyword'>{WebUtility.HtmlEncode(k)}</span>"))}</div>
+                </div>
+                <div class='content'>
+                    {string.Join("\n", source.Value.Select(content => $"<p>{WebUtility.HtmlEncode(content)}</p>"))}
+                </div>
+            </div>
+        ");
+            }
 
             return $@"
     <html>
@@ -213,50 +463,149 @@ namespace CsBe_Browser_2._0
                 padding-bottom: 0.5em;
                 border-bottom: 2px solid #f0f0f0;
             }}
-            .summary {{
+            h4 {{
+                color: #1a73e8;
+                font-size: 1.1em;
+                margin: 1em 0 0.5em 0;
+            }}
+            .source-section {{
                 background: #f8f9fa;
                 padding: 1.5em;
                 border-radius: 8px;
                 margin-bottom: 1em;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                color: #000;
             }}
-            .key-points {{
-                margin-top: 1.5em;
-                color: #000;
-            }}
-            .key-points ul {{
-                margin: 0;
-                padding-left: 1.5em;
-            }}
-            .key-points li {{
+            h3 {{
+                color: #1a73e8;
+                font-size: 1.2em;
                 margin-bottom: 0.5em;
             }}
-            .sources {{
+            .keywords {{
+                margin: 1em 0;
+                padding: 1em;
+                background: #fff;
+                border-radius: 4px;
+            }}
+            .keyword-tags {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5em;
+            }}
+            .keyword {{
+                background: #e8f0fe;
+                color: #1967d2;
+                padding: 0.3em 0.8em;
+                border-radius: 1em;
                 font-size: 0.9em;
-                color: #666;
-                margin-top: 2em;
-                padding-top: 1em;
-                border-top: 1px solid #eee;
+            }}
+            ul {{
+                margin: 0.5em 0;
+                padding-left: 1.5em;
+            }}
+            li {{
+                margin: 0.3em 0;
+                color: #202124;
+            }}
+            p {{
+                color: #000;
+                font-size: 1.1em;
+                line-height: 1.8;
+                margin-bottom: 1em;
             }}
         </style>
     </head>
     <body>
         <h2>{WebUtility.HtmlEncode(query)}</h2>
-        <div class='summary'>
-            {WebUtility.HtmlEncode(summary).Replace("\n\n", "<br><br>")}
-        </div>
-        {(selectedKeyPoints.Any() ? $@"
-        <div class='key-points'>
-            <ul>
-                {string.Join("\n", selectedKeyPoints.Select(p => $"<li>{WebUtility.HtmlEncode(p)}</li>"))}
-            </ul>
-        </div>" : "")}
-        <div class='sources'>
-            Sources: {string.Join(", ", sources)}
+        {contentHtml}
+    </body>
+    </html>";
+        }
+
+        private List<string> ExtractKeywords(string text)
+        {
+            var words = text.ToLower()
+                .Split(new[] { ' ', '\n', '\r', '.', ',', ';', ':', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length > 3)
+                .GroupBy(w => w)
+                .OrderByDescending(g => g.Count())
+                .Where(g => !IsStopWord(g.Key))
+                .Select(g => g.Key)
+                .ToList();
+
+            return words;
+        }
+
+        private List<string> ExtractBulletPoints(string text)
+        {
+            var sentences = text.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => s.Length > 20 && s.Length < 150)
+                .ToList();
+
+            return sentences;
+        }
+
+        private bool IsStopWord(string word)
+        {
+            var stopWords = new HashSet<string>
+    {
+        "the", "be", "to", "of", "and", "a", "in", "that", "have",
+        "i", "it", "for", "not", "on", "with", "he", "as", "you",
+        "do", "at", "this", "but", "his", "by", "from", "they",
+        "we", "say", "her", "she", "or", "an", "will", "my",
+        "one", "all", "would", "there", "their", "what", "about"
+    };
+
+            return stopWords.Contains(word);
+        }
+        private void ShowProgressIndicator(string query)
+        {
+            var progressHtml = $@"
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background: #f8f9fa;
+            }}
+            .loader {{
+                text-align: center;
+                padding: 2rem;
+                background: white;
+                border-radius: 1rem;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            }}
+            .spinner {{
+                width: 40px;
+                height: 40px;
+                margin: 1rem auto;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #3498db;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }}
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class='loader'>
+            <div class='spinner'></div>
+            <p>Analyzing results for:<br><strong>{WebUtility.HtmlEncode(query)}</strong></p>
         </div>
     </body>
     </html>";
+
+            WebView.NavigateToString(progressHtml);
+            WebView.Visibility = Visibility.Visible;
+            HomePanel.Visibility = Visibility.Collapsed;
         }
         public BrowserTab(string title = "New Tab")
         {
