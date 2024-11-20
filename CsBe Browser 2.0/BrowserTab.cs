@@ -98,10 +98,7 @@ namespace CsBe_Browser_2._0
                 bool isTechQuery = techTerms.Any(term => query.ToLower().Contains(term));
 
 
-                var searchUrl = isTechQuery ?
-                    $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}+site:apple.com+OR+site:macrumors.com+OR+site:9to5mac.com+OR+site:theverge.com" :
-                    $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
-
+                var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
                 var response = await _httpClient.GetStringAsync(searchUrl);
                 var doc = new HtmlDocument();
                 doc.LoadHtml(response);
@@ -133,6 +130,7 @@ namespace CsBe_Browser_2._0
                         var pageDoc = new HtmlDocument();
                         pageDoc.LoadHtml(pageContent);
 
+                        // Remove unwanted nodes
                         foreach (var node in pageDoc.DocumentNode.SelectNodes("//script|//style|//nav|//header|//footer|//aside|//iframe|//form|//*[contains(@class, 'cookie')]|//*[contains(@class, 'ad')]")?.ToList() ?? new List<HtmlNode>())
                         {
                             node.Remove();
@@ -152,7 +150,18 @@ namespace CsBe_Browser_2._0
                                     IsRelevantToQuery(text, query))
                                 .ToList();
 
-                            contentPieces.AddRange(paragraphs);
+                            // Score the paragraphs based on keyword relevance
+                            var scoredParagraphs = paragraphs.Select(p => new
+                            {
+                                Paragraph = p,
+                                Score = CalculateRelevanceScore(p, query) // New scoring function
+                            })
+                            .Where(x => x.Score > 0) // Only keep relevant paragraphs
+                            .OrderByDescending(x => x.Score) // Order by relevance
+                            .Select(x => x.Paragraph)
+                            .ToList();
+
+                            contentPieces.AddRange(scoredParagraphs);
                         }
                     }
                     catch
@@ -160,7 +169,6 @@ namespace CsBe_Browser_2._0
                         continue;
                     }
                 }
-
                 if (!contentPieces.Any())
                 {
                     MessageBox.Show("Could not extract meaningful information from the sources.");
@@ -177,6 +185,21 @@ namespace CsBe_Browser_2._0
             {
                 MessageBox.Show($"Search error: {ex.Message}");
             }
+        }
+        private int CalculateRelevanceScore(string text, string query)
+        {
+            var queryWords = query.ToLower().Split(' ', ',', '.').Where(w => w.Length > 2).ToList();
+            int score = 0;
+
+            foreach (var word in queryWords)
+            {
+                if (text.ToLower().Contains(word))
+                {
+                    score += 1; // Increment score for each match
+                }
+            }
+
+            return score;
         }
 
         private void ShowProgressIndicator(string query)
