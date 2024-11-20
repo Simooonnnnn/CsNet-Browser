@@ -39,16 +39,43 @@ namespace CsBe_Browser_2._0
 
         private void CreateNewTab()
         {
-            var tab = new BrowserTab();
-            _tabs.Add(tab);
-            TabsPanel.Children.Add(tab.TabButton);
-            ContentArea.Children.Add(tab.WebView);
-            ContentArea.Children.Add(tab.HomePanel);
-            tab.TabButton.Click += (s, e) => SwitchToTab(tab);
-            tab.CloseRequested += (s, e) => CloseTab(tab); // Add this line
-            SwitchToTab(tab);
-        }
+            try
+            {
+                var tab = new BrowserTab();
 
+                // Debug checks
+                if (tab.TabButton == null)
+                    MessageBox.Show("TabButton is null");
+                if (tab.WebView == null)
+                    MessageBox.Show("WebView is null");
+                if (tab.HomePanel == null)
+                    MessageBox.Show("HomePanel is null");
+
+                if (TabsPanel == null)
+                    MessageBox.Show("TabsPanel is null");
+                if (ContentArea == null)
+                    MessageBox.Show("ContentArea is null");
+
+                _tabs.Add(tab);
+
+                if (tab.TabButton != null)
+                    TabsPanel.Children.Add(tab.TabButton);
+
+                if (tab.WebView != null)
+                    ContentArea.Children.Add(tab.WebView);
+
+                if (tab.HomePanel != null)
+                    ContentArea.Children.Add(tab.HomePanel);
+
+                tab.TabButton.Click += (s, e) => SwitchToTab(tab);
+                tab.CloseRequested += (s, e) => CloseTab(tab);
+                SwitchToTab(tab);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error creating new tab: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
         private void CloseTab(BrowserTab tab)
         {
             if (_tabs.Count <= 1) return;
