@@ -12,10 +12,13 @@ using System.ComponentModel;
 using HtmlAgilityPack;
 using System.Collections.Generic;
 using System.Net;
+using System.Windows.Documents;
+using System.DirectoryServices;
 
 namespace CsBe_Browser_2._0
 {
     public class BrowserTab : INotifyPropertyChanged
+
     {
         private readonly HttpClient _httpClient = new HttpClient();
         public string Id { get; }
@@ -54,7 +57,6 @@ namespace CsBe_Browser_2._0
             text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\.,!?:;\-()]", "");
             return text.Trim();
         }
-
         private async Task PerformCsNetSearch(string query)
         {
             try
@@ -70,11 +72,29 @@ namespace CsBe_Browser_2._0
                     return;
                 }
 
+                // Update the tab title
+                var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
+                titleBlock.Text = "CsNet Suche";
+                Title = "CsNet Suche";
+
+                // Update the URL bar with the custom format
+                var mainWindow = Application.Current.MainWindow as MainWindow;
+                if (mainWindow != null)
+                {
+                    var addressBar = mainWindow.FindName("AddressBar") as TextBox;
+                    if (addressBar != null)
+                    {
+                        addressBar.Text = $"cs-net.search/{Uri.EscapeDataString(query)}";
+                        addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
+                    }
+                }
+
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
                 var techTerms = new[] { "apple", "iphone", "ipad", "mac", "macbook", "processor", "chip", "specs", "m1", "m2", "m3" };
                 bool isTechQuery = techTerms.Any(term => query.ToLower().Contains(term));
+
 
                 var searchUrl = isTechQuery ?
                     $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}+site:apple.com+OR+site:macrumors.com+OR+site:9to5mac.com+OR+site:theverge.com" :
@@ -157,259 +177,82 @@ namespace CsBe_Browser_2._0
             }
         }
 
-        private bool ContainsUnwantedDomain(string url)
+        private void ShowProgressIndicator(string query)
         {
-            var unwantedDomains = new[]
+            // Update the tab title and URL bar here too for consistency
+            var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
+            titleBlock.Text = "CsNet Suche";
+            Title = "CsNet Suche";
+
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            if (mainWindow != null)
             {
-        "facebook.com", "twitter.com", "instagram.com", "pinterest.com",
-        "linkedin.com", "youtube.com", "reddit.com", "tumblr.com",
-        "microsoft.com/en-us/legal", "privacy", "terms", "cookie"
-    };
-
-            return unwantedDomains.Any(domain => url.Contains(domain));
-        }
-
-        private bool ContainsUnwantedContent(string text)
-        {
-            var unwantedPatterns = new[]
-            {
-        "cookie", "privacy", "copyright", "subscribe", "newsletter",
-        "sign up", "log in", "advertisement", "sponsored", "terms of service",
-        "click here", "read more", "learn more", "accept all cookies",
-        "privacy settings", "cookie settings"
-    };
-
-            return text.ToLower().Contains("$") ||
-                   text.Contains("@") ||
-                   unwantedPatterns.Any(pattern => text.ToLower().Contains(pattern));
-        }
-
-        private bool IsRelevantToQuery(string text, string query)
-        {
-            var queryWords = query.ToLower().Split(' ', ',', '.').Where(w => w.Length > 2);
-            var textWords = text.ToLower().Split(' ');
-
-            int matchCount = queryWords.Count(queryWord =>
-                textWords.Any(word => word.Contains(queryWord)));
-
-            return matchCount >= 1;
-        }
-        private async Task PerformGeneralSearch(string query)
-        {
-            var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
-            var response = await _httpClient.GetStringAsync(searchUrl);
-            var doc = new HtmlDocument();
-            doc.LoadHtml(response);
-
-            var links = doc.DocumentNode
-                .SelectNodes("//div[contains(@class, 'result__body')]//a[@class='result__url']")
-                ?.Select(a => "https://" + a.InnerText.Trim())
-                .Where(url => !string.IsNullOrWhiteSpace(url))
-                .Take(5)
-                .ToList();
-
-            if (links == null || !links.Any())
-            {
-                MessageBox.Show("No search results found.");
-                return;
-            }
-
-            ShowProgressIndicator(query);
-            var contentAnalyzer = new ContentAnalyzer();
-            var results = await contentAnalyzer.AnalyzeUrls(links, query, _httpClient);
-            var htmlContent = GenerateFormattedOutput(query, results);
-            WebView.NavigateToString(htmlContent);
-        }
-
-        private class ContentAnalyzer
-        {
-            private string CleanText(string text)
-            {
-                if (string.IsNullOrWhiteSpace(text)) return string.Empty;
-
-                text = WebUtility.HtmlDecode(text);
-                text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-                text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\.,!?:;\-()]", "");
-                text = System.Text.RegularExpressions.Regex.Replace(text, @"\.(?! )", ". ");
-
-                // Don't convert everything to title case
-                return text.Trim();
-            }
-
-            public async Task<SearchResults> AnalyzeUrls(List<string> urls, string query, HttpClient client)
-            {
-                var results = new SearchResults();
-                var keywordWeights = ExtractKeywords(query);
-                var queryTopics = DetermineQueryTopics(query);
-
-                foreach (var url in urls)
+                var addressBar = mainWindow.FindName("AddressBar") as TextBox;
+                if (addressBar != null)
                 {
-                    try
-                    {
-                        var content = await client.GetStringAsync(url);
-                        var doc = new HtmlDocument();
-                        doc.LoadHtml(content);
-
-                        // Remove unnecessary elements
-                        foreach (var node in doc.DocumentNode.SelectNodes("//script|//style|//nav|//header|//footer|//aside|//iframe|//form|//*[contains(@class, 'cookie')]|//*[contains(@class, 'ad')]|//*[contains(@class, 'banner')]")?.ToList() ?? new List<HtmlNode>())
-                        {
-                            node.Remove();
-                        }
-
-                        // Try to find the most relevant content section
-                        var mainContent = doc.DocumentNode.SelectNodes("//article|//main|//div[contains(@class, 'content')]|//div[contains(@class, 'post')]")?.FirstOrDefault()
-                            ?? doc.DocumentNode;
-
-                        var paragraphs = mainContent
-                            .SelectNodes(".//p|.//h1|.//h2|.//h3|.//li[not(ancestor::nav)]")
-                            ?.Select(node => new { Text = CleanText(node.InnerText), Node = node })
-                            .Where(p => IsRelevantContent(p.Text, keywordWeights, queryTopics))
-                            .ToList();
-
-                        if (paragraphs != null && paragraphs.Any())
-                        {
-                            var relevantContent = paragraphs
-                                .OrderByDescending(p => CalculateRelevanceScore(p.Text, keywordWeights, queryTopics))
-                                .Take(3)
-                                .Select(p => p.Text)
-                                .ToList();
-
-                            results.AddContent(new Uri(url).Host, relevantContent);
-                        }
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-                }
-
-                return results;
-            }
-
-            private Dictionary<string, double> ExtractKeywords(string query)
-            {
-                var keywords = new Dictionary<string, double>();
-                var words = query.ToLower().Split(new[] { ' ', ',', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
-
-                foreach (var word in words)
-                {
-                    if (word.Length > 2 && !IsStopWord(word))
-                    {
-                        keywords[word] = 1.0;
-
-                        // Add common variations
-                        if (word.EndsWith("s")) keywords[word.TrimEnd('s')] = 0.9;
-                        if (word.EndsWith("es")) keywords[word.Substring(0, word.Length - 2)] = 0.9;
-                        if (word.EndsWith("ing")) keywords[word.Substring(0, word.Length - 3)] = 0.9;
-                        if (word.EndsWith("ed")) keywords[word.Substring(0, word.Length - 2)] = 0.9;
-                    }
-                }
-
-                return keywords;
-            }
-
-            private Dictionary<string, HashSet<string>> DetermineQueryTopics(string query)
-            {
-                return new Dictionary<string, HashSet<string>>
-                {
-                    ["tech"] = new HashSet<string> { "processor", "cpu", "gpu", "ram", "memory", "storage", "battery", "display", "screen", "camera", "chip", "performance", "benchmark" },
-                    ["specs"] = new HashSet<string> { "specifications", "features", "dimensions", "weight", "capacity", "size", "price", "cost" },
-                    ["release"] = new HashSet<string> { "launch", "release", "announce", "debut", "unveil", "reveal" }
-                };
-            }
-
-            private bool IsRelevantContent(string text, Dictionary<string, double> keywords, Dictionary<string, HashSet<string>> topics)
-            {
-                if (string.IsNullOrWhiteSpace(text) || text.Length < 30 || text.Length > 1000)
-                    return false;
-
-                var words = text.ToLower().Split(' ');
-                var keywordCount = words.Count(w => keywords.Keys.Any(k => w.Contains(k)));
-                var topicMatchCount = words.Count(w => topics.Values.Any(topicWords => topicWords.Any(t => w.Contains(t))));
-
-                return (keywordCount >= 1 || topicMatchCount >= 2) && !ContainsUnwantedContent(text);
-            }
-
-            private double CalculateRelevanceScore(string text, Dictionary<string, double> keywords, Dictionary<string, HashSet<string>> topics)
-            {
-                var words = text.ToLower().Split(' ');
-                double score = 0;
-
-                // Keyword matching
-                foreach (var word in words)
-                {
-                    var matchingKeyword = keywords.Keys.FirstOrDefault(k => word.Contains(k));
-                    if (matchingKeyword != null)
-                    {
-                        score += keywords[matchingKeyword] * 2;  // Increase keyword weight
-                    }
-                }
-
-                // Topic matching
-                foreach (var topic in topics)
-                {
-                    foreach (var topicWord in topic.Value)
-                    {
-                        if (words.Any(w => w.Contains(topicWord)))
-                        {
-                            score += 0.5;  // Add topic relevance
-                        }
-                    }
-                }
-
-                // Prefer medium-length, focused paragraphs
-                var lengthScore = Math.Min(1.0, text.Length / 200.0);
-                if (text.Length > 500) lengthScore *= 0.7;  // Penalize very long paragraphs
-
-                return score * lengthScore;
-            }
-
-            private bool ContainsUnwantedContent(string text)
-            {
-                var unwantedPatterns = new[]
-                {
-            "cookie", "privacy", "copyright", "subscribe", "newsletter",
-            "sign up", "log in", "advertisement", "sponsored", "terms of service",
-            "click here", "read more", "learn more"
-        };
-
-                text = text.ToLower();
-                return unwantedPatterns.Any(pattern => text.Contains(pattern)) ||
-                       text.Count(c => c == '$') > 2 ||  // Avoid price-heavy content
-                       text.Count(c => c == '@') > 0;    // Avoid contact information
-            }
-
-            private bool IsStopWord(string word)
-            {
-                var stopWords = new HashSet<string>
-        {
-            "the", "be", "to", "of", "and", "a", "in", "that", "have",
-            "i", "it", "for", "not", "on", "with", "he", "as", "you",
-            "do", "at", "this", "but", "his", "by", "from", "they",
-            "we", "say", "her", "she", "or", "an", "will", "my",
-            "one", "all", "would", "there", "their", "what"
-        };
-
-                return stopWords.Contains(word);
-            }
-        }
-
-        // Rest of the code remains the same (SearchResults class, GenerateFormattedOutput, and ShowProgressIndicator methods)
-        private class SearchResults
-        {
-            public Dictionary<string, List<string>> ContentBySources { get; } = new();
-
-            public void AddContent(string source, List<string> content)
-            {
-                if (ContentBySources.ContainsKey(source))
-                {
-                    ContentBySources[source].AddRange(content);
-                }
-                else
-                {
-                    ContentBySources[source] = content;
+                    addressBar.Text = $"cs-net.search/{Uri.EscapeDataString(query)}";
+                    addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
                 }
             }
+
+            var progressHtml = $@"
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background: #f8f9fa;
+            }}
+            .loader {{
+                text-align: center;
+                padding: 2rem;
+                background: white;
+                border-radius: 1rem;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            }}
+            .spinner {{
+                width: 40px;
+                height: 40px;
+                margin: 1rem auto;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #3498db;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }}
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            .url-bar {{
+                color: #5f6368;
+                font-size: 14px;
+                margin-bottom: 1rem;
+                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            }}
+            .url-bar strong {{
+                color: #202124;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class='loader'>
+            <div class='url-bar'>
+                <strong>cs-net.search</strong>/{WebUtility.HtmlEncode(query)}
+            </div>
+            <div class='spinner'></div>
+            <p>Analyzing results for:<br><strong>{WebUtility.HtmlEncode(query)}</strong></p>
+        </div>
+    </body>
+    </html>";
+
+            WebView.NavigateToString(progressHtml);
+            WebView.Visibility = Visibility.Visible;
+            HomePanel.Visibility = Visibility.Collapsed;
         }
 
         private string GenerateFormattedOutput(string query, SearchResults results)
@@ -427,9 +270,9 @@ namespace CsBe_Browser_2._0
                     <h4>Kernpunkte:</h4>
                     <ul>
                         {string.Join("\n", source.Value
-                                    .SelectMany(text => ExtractBulletPoints(text))
-                                    .Take(5)
-                                    .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
+                                            .SelectMany(text => ExtractBulletPoints(text))
+                                            .Take(5)
+                                            .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
                     </ul>
                 </div>
                 <div class='keywords'>
@@ -447,6 +290,19 @@ namespace CsBe_Browser_2._0
     <html>
     <head>
         <style>
+.url-bar {{
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 1.2em;
+                margin-bottom: 1.5em;
+                padding-bottom: 0.5em;
+                border-bottom: 2px solid #f0f0f0;
+            }}
+            .url-domain {{
+                color: #202124;
+            }}
+            .url-path {{
+                color: #5f6368;
+            }}
             body {{ 
                 font-family: 'Segoe UI', Arial, sans-serif;
                 line-height: 1.6;
@@ -513,9 +369,26 @@ namespace CsBe_Browser_2._0
                 line-height: 1.8;
                 margin-bottom: 1em;
             }}
+            .url-bar {{
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 1.2em;
+                margin-bottom: 1.5em;
+                padding-bottom: 0.5em;
+                border-bottom: 2px solid #f0f0f0;
+            }}
+            .url-domain {{
+                color: #202124;
+            }}
+            .url-path {{
+                color: #5f6368;
+            }}
         </style>
     </head>
     <body>
+
+        <div class='url-bar'>
+            <span class='url-domain'>cs-net.search</span><span class='url-path'>/{WebUtility.HtmlEncode(query)}</span>
+        </div>
         <h2>Suchergebnisse für: {WebUtility.HtmlEncode(query)}</h2>
         {contentHtml}
     </body>
@@ -558,54 +431,57 @@ namespace CsBe_Browser_2._0
 
             return stopWords.Contains(word);
         }
-        private void ShowProgressIndicator(string query)
+        private class SearchResults
         {
-            var progressHtml = $@"
-    <html>
-    <head>
-        <style>
-            body {{
-                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-                background: #f8f9fa;
-            }}
-            .loader {{
-                text-align: center;
-                padding: 2rem;
-                background: white;
-                border-radius: 1rem;
-                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            }}
-            .spinner {{
-                width: 40px;
-                height: 40px;
-                margin: 1rem auto;
-                border: 3px solid #f3f3f3;
-                border-top: 3px solid #3498db;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            }}
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div class='loader'>
-            <div class='spinner'></div>
-            <p>Analyzing results for:<br><strong>{WebUtility.HtmlEncode(query)}</strong></p>
-        </div>
-    </body>
-    </html>";
+            public Dictionary<string, List<string>> ContentBySources { get; } = new();
 
-            WebView.NavigateToString(progressHtml);
-            WebView.Visibility = Visibility.Visible;
-            HomePanel.Visibility = Visibility.Collapsed;
+            public void AddContent(string source, List<string> content)
+            {
+                if (ContentBySources.ContainsKey(source))
+                {
+                    ContentBySources[source].AddRange(content);
+                }
+                else
+                {
+                    ContentBySources[source] = content;
+                }
+            }
+        }
+
+        private bool ContainsUnwantedContent(string text)
+        {
+            var unwantedPatterns = new[]
+            {
+            "cookie", "privacy", "copyright", "subscribe", "newsletter",
+            "sign up", "log in", "advertisement", "sponsored", "terms of service",
+            "click here", "read more", "learn more", "accept all cookies",
+            "privacy settings", "cookie settings"
+        };
+
+            return text.ToLower().Contains("$") ||
+                   text.Contains("@") ||
+                   unwantedPatterns.Any(pattern => text.ToLower().Contains(pattern));
+        }
+        private bool ContainsUnwantedDomain(string url)
+        {
+            var unwantedDomains = new[]
+            {
+        "facebook.com", "twitter.com", "instagram.com", "pinterest.com",
+        "linkedin.com", "youtube.com", "reddit.com", "tumblr.com",
+        "microsoft.com/en-us/legal", "privacy", "terms", "cookie"
+    };
+
+            return unwantedDomains.Any(domain => url.Contains(domain));
+        }
+        private bool IsRelevantToQuery(string text, string query)
+        {
+            var queryWords = query.ToLower().Split(' ', ',', '.').Where(w => w.Length > 2);
+            var textWords = text.ToLower().Split(' ');
+
+            int matchCount = queryWords.Count(queryWord =>
+                textWords.Any(word => word.Contains(queryWord)));
+
+            return matchCount >= 1;
         }
         public BrowserTab(string title = "Neuer Tab")
         {
@@ -695,9 +571,61 @@ namespace CsBe_Browser_2._0
             {
                 Title = WebView.CoreWebView2.DocumentTitle;
                 titleBlock.Text = string.IsNullOrEmpty(Title) ? "Neuer Tab" : Title;
+
+                // Add URL handling logic
+                if (WebView.Source != null)
+                {
+                    var url = WebView.Source.ToString();
+                    var mainWindow = Application.Current.MainWindow as MainWindow;
+                    if (mainWindow != null)
+                    {
+                        var addressBar = mainWindow.FindName("AddressBar") as TextBox;
+                        if (addressBar != null)
+                        {
+                            try
+                            {
+                                var uri = new Uri(url);
+                                string domain = uri.Host;
+
+                                // Special case for about:blank
+                                if (uri.Scheme == "about")
+                                {
+                                    addressBar.Text = uri.AbsoluteUri;
+                                    return;
+                                }
+
+                                // Remove www. prefix if present
+                                if (domain.StartsWith("www."))
+                                {
+                                    domain = domain.Substring(4);
+                                }
+
+                                // Set the full URL in the address bar
+                                addressBar.Text = url;
+
+                                // Set different colors for domain and path
+                                if (!string.IsNullOrEmpty(uri.PathAndQuery) && uri.PathAndQuery != "/")
+                                {
+                                    addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368"));
+                                }
+                                else
+                                {
+                                    addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
+                                }
+                            }
+                            catch
+                            {
+                                // If URL parsing fails, just show the raw URL
+                                addressBar.Text = url;
+                                addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
+                            }
+                        }
+                    }
+                }
             };
-        }
-        private void UpdateTabAppearance()
+
+
+        } private void UpdateTabAppearance()
         {
             if (IsSelected)
             {
