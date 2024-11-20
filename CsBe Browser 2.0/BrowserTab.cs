@@ -26,6 +26,8 @@ namespace CsBe_Browser_2._0
         public Button TabButton { get; }
         public WebView2 WebView { get; }
         public Grid HomePanel { get; }
+        private bool _isCustomSearch = false;
+        private string _customSearchQuery = string.Empty;
 
         private bool _isSelected;
         public bool IsSelected
@@ -61,6 +63,9 @@ namespace CsBe_Browser_2._0
         {
             try
             {
+                _isCustomSearch = true;
+                _customSearchQuery = query;
+
                 if (WebView.CoreWebView2 == null)
                 {
                     await WebView.EnsureCoreWebView2Async();
@@ -89,12 +94,16 @@ namespace CsBe_Browser_2._0
                     }
                 }
 
+                // Also update the WebView's source to match our custom URL format
+                WebView.Source = new Uri($"about:blank");  // This prevents the about:blank from showing
+
+                ShowProgressIndicator(query);
+
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
                 var techTerms = new[] { "apple", "iphone", "ipad", "mac", "macbook", "processor", "chip", "specs", "m1", "m2", "m3" };
                 bool isTechQuery = techTerms.Any(term => query.ToLower().Contains(term));
-
 
                 var searchUrl = isTechQuery ?
                     $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}+site:apple.com+OR+site:macrumors.com+OR+site:9to5mac.com+OR+site:theverge.com" :
@@ -117,8 +126,6 @@ namespace CsBe_Browser_2._0
                     MessageBox.Show("No search results found.");
                     return;
                 }
-
-                ShowProgressIndicator(query);
 
                 var contentPieces = new List<string>();
                 var sources = new HashSet<string>();
@@ -176,7 +183,6 @@ namespace CsBe_Browser_2._0
                 MessageBox.Show($"Search error: {ex.Message}");
             }
         }
-
         private void ShowProgressIndicator(string query)
         {
             // Update the tab title and URL bar here too for consistency
@@ -228,22 +234,10 @@ namespace CsBe_Browser_2._0
                 0% {{ transform: rotate(0deg); }}
                 100% {{ transform: rotate(360deg); }}
             }}
-            .url-bar {{
-                color: #5f6368;
-                font-size: 14px;
-                margin-bottom: 1rem;
-                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            }}
-            .url-bar strong {{
-                color: #202124;
-            }}
         </style>
     </head>
     <body>
         <div class='loader'>
-            <div class='url-bar'>
-                <strong>cs-net.search</strong>/{WebUtility.HtmlEncode(query)}
-            </div>
             <div class='spinner'></div>
             <p>Analyzing results for:<br><strong>{WebUtility.HtmlEncode(query)}</strong></p>
         </div>
@@ -254,7 +248,6 @@ namespace CsBe_Browser_2._0
             WebView.Visibility = Visibility.Visible;
             HomePanel.Visibility = Visibility.Collapsed;
         }
-
         private string GenerateFormattedOutput(string query, SearchResults results)
         {
             var contentHtml = new System.Text.StringBuilder();
@@ -270,9 +263,9 @@ namespace CsBe_Browser_2._0
                     <h4>Kernpunkte:</h4>
                     <ul>
                         {string.Join("\n", source.Value
-                                            .SelectMany(text => ExtractBulletPoints(text))
-                                            .Take(5)
-                                            .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
+                                                    .SelectMany(text => ExtractBulletPoints(text))
+                                                    .Take(5)
+                                                    .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
                     </ul>
                 </div>
                 <div class='keywords'>
@@ -290,19 +283,6 @@ namespace CsBe_Browser_2._0
     <html>
     <head>
         <style>
-.url-bar {{
-                font-family: 'Segoe UI', Arial, sans-serif;
-                font-size: 1.2em;
-                margin-bottom: 1.5em;
-                padding-bottom: 0.5em;
-                border-bottom: 2px solid #f0f0f0;
-            }}
-            .url-domain {{
-                color: #202124;
-            }}
-            .url-path {{
-                color: #5f6368;
-            }}
             body {{ 
                 font-family: 'Segoe UI', Arial, sans-serif;
                 line-height: 1.6;
@@ -369,26 +349,9 @@ namespace CsBe_Browser_2._0
                 line-height: 1.8;
                 margin-bottom: 1em;
             }}
-            .url-bar {{
-                font-family: 'Segoe UI', Arial, sans-serif;
-                font-size: 1.2em;
-                margin-bottom: 1.5em;
-                padding-bottom: 0.5em;
-                border-bottom: 2px solid #f0f0f0;
-            }}
-            .url-domain {{
-                color: #202124;
-            }}
-            .url-path {{
-                color: #5f6368;
-            }}
         </style>
     </head>
     <body>
-
-        <div class='url-bar'>
-            <span class='url-domain'>cs-net.search</span><span class='url-path'>/{WebUtility.HtmlEncode(query)}</span>
-        </div>
         <h2>Suchergebnisse für: {WebUtility.HtmlEncode(query)}</h2>
         {contentHtml}
     </body>
@@ -466,8 +429,8 @@ namespace CsBe_Browser_2._0
         {
             var unwantedDomains = new[]
             {
-        "facebook.com", "twitter.com", "instagram.com", "pinterest.com",
-        "linkedin.com", "youtube.com", "reddit.com", "tumblr.com",
+        "facebook.com", "instagram.com", "pinterest.com",
+        "linkedin.com", "youtube.com", "tumblr.com",
         "microsoft.com/en-us/legal", "privacy", "terms", "cookie"
     };
 
@@ -569,55 +532,72 @@ namespace CsBe_Browser_2._0
             // Navigation completed event
             WebView.NavigationCompleted += (s, e) =>
             {
-                Title = WebView.CoreWebView2.DocumentTitle;
-                titleBlock.Text = string.IsNullOrEmpty(Title) ? "Neuer Tab" : Title;
-
-                // Add URL handling logic
-                if (WebView.Source != null)
+                if (_isCustomSearch)
                 {
-                    var url = WebView.Source.ToString();
+                    // Keep the custom title and URL for CsNet searches
+                    var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
+                    titleBlock.Text = "CsNet Suche";
+                    Title = "CsNet Suche";
+
                     var mainWindow = Application.Current.MainWindow as MainWindow;
                     if (mainWindow != null)
                     {
                         var addressBar = mainWindow.FindName("AddressBar") as TextBox;
                         if (addressBar != null)
                         {
-                            try
+                            addressBar.Text = $"cs-net.search/{Uri.EscapeDataString(_customSearchQuery)}";
+                            addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
+                        }
+                    }
+                }
+                else
+                {
+                    // Regular navigation handling
+                    Title = WebView.CoreWebView2.DocumentTitle;
+                    var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
+                    titleBlock.Text = string.IsNullOrEmpty(Title) ? "Neuer Tab" : Title;
+
+                    if (WebView.Source != null)
+                    {
+                        var url = WebView.Source.ToString();
+                        var mainWindow = Application.Current.MainWindow as MainWindow;
+                        if (mainWindow != null)
+                        {
+                            var addressBar = mainWindow.FindName("AddressBar") as TextBox;
+                            if (addressBar != null)
                             {
-                                var uri = new Uri(url);
-                                string domain = uri.Host;
-
-                                // Special case for about:blank
-                                if (uri.Scheme == "about")
+                                try
                                 {
-                                    addressBar.Text = uri.AbsoluteUri;
-                                    return;
+                                    var uri = new Uri(url);
+                                    string domain = uri.Host;
+
+                                    if (uri.Scheme == "about")
+                                    {
+                                        addressBar.Text = uri.AbsoluteUri;
+                                        return;
+                                    }
+
+                                    if (domain.StartsWith("www."))
+                                    {
+                                        domain = domain.Substring(4);
+                                    }
+
+                                    addressBar.Text = url;
+
+                                    if (!string.IsNullOrEmpty(uri.PathAndQuery) && uri.PathAndQuery != "/")
+                                    {
+                                        addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368"));
+                                    }
+                                    else
+                                    {
+                                        addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
+                                    }
                                 }
-
-                                // Remove www. prefix if present
-                                if (domain.StartsWith("www."))
+                                catch
                                 {
-                                    domain = domain.Substring(4);
-                                }
-
-                                // Set the full URL in the address bar
-                                addressBar.Text = url;
-
-                                // Set different colors for domain and path
-                                if (!string.IsNullOrEmpty(uri.PathAndQuery) && uri.PathAndQuery != "/")
-                                {
-                                    addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368"));
-                                }
-                                else
-                                {
+                                    addressBar.Text = url;
                                     addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
                                 }
-                            }
-                            catch
-                            {
-                                // If URL parsing fails, just show the raw URL
-                                addressBar.Text = url;
-                                addressBar.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
                             }
                         }
                     }
@@ -625,7 +605,8 @@ namespace CsBe_Browser_2._0
             };
 
 
-        } private void UpdateTabAppearance()
+        }
+        private void UpdateTabAppearance()
         {
             if (IsSelected)
             {
