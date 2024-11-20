@@ -153,6 +153,18 @@ namespace CsBe_Browser_2._0
         {
             if (_currentTab != null)
             {
+                // Reset custom search state
+                if (_currentTab is BrowserTab browserTab)
+                {
+                    var field = browserTab.GetType().GetField("_isCustomSearch",
+                        System.Reflection.BindingFlags.NonPublic |
+                        System.Reflection.BindingFlags.Instance);
+                    if (field != null)
+                    {
+                        field.SetValue(browserTab, false);
+                    }
+                }
+
                 // Navigate to about:blank instead of setting Source to null
                 _currentTab.WebView.Source = new Uri("about:blank");
                 _currentTab.WebView.Visibility = Visibility.Collapsed;
