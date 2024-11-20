@@ -6,6 +6,23 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
+public static class VisualTreeHelperExtensions
+{
+    public static IEnumerable<DependencyObject> VisualDescendants(this DependencyObject root)
+    {
+        if (root == null)
+            yield break;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+
+            foreach (var descendant in VisualDescendants(child))
+                yield return descendant;
+        }
+    }
+}
 namespace CsBe_Browser_2._0
 {
     public partial class MainWindow : Window
@@ -109,13 +126,28 @@ namespace CsBe_Browser_2._0
         {
             if (_currentTab != null)
             {
-                _currentTab.WebView.Source = null;
+                // Navigate to about:blank instead of setting Source to null
+                _currentTab.WebView.Source = new Uri("about:blank");
                 _currentTab.WebView.Visibility = Visibility.Collapsed;
+
+                // Show the home panel
                 _currentTab.HomePanel.Visibility = Visibility.Visible;
+
+                // Clear both search boxes
                 AddressBar.Text = string.Empty;
+                var searchBox = _currentTab.HomePanel.VisualDescendants().OfType<TextBox>().FirstOrDefault();
+                if (searchBox != null)
+                {
+                    searchBox.Text = "Das Web durchsuchen";
+                    searchBox.Foreground = Brushes.Gray;
+                }
+
+                // Reset the tab title
+                var titleBlock = ((DockPanel)_currentTab.TabButton.Content).Children.OfType<TextBlock>().First();
+                titleBlock.Text = "Neuer Tab";
+                _currentTab.Title = "Neuer Tab";
             }
         }
-
         private void NavigateToUrl(string input)
         {
             if (_currentTab == null) return;
