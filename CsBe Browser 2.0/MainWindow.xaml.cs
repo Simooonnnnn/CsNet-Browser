@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes; // Add this line with your other using statements
 
 public static class VisualTreeHelperExtensions
 {
@@ -37,6 +38,50 @@ namespace CsBe_Browser_2._0
             CreateNewTab();
         }
 
+        // Add these window control methods
+        private void TopBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                ToggleMaximize();
+            }
+            else
+            {
+                this.DragMove();
+            }
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleMaximize();
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
+        private void ToggleMaximize()
+        {
+            var maximizeIcon = MaximizeButton.Content as Path;
+            if (this.WindowState == WindowState.Maximized)
+            {
+                this.WindowState = WindowState.Normal;
+                if (maximizeIcon != null)
+                    maximizeIcon.Data = Geometry.Parse("M 0,0 H 10 V 10 H 0 Z");
+            }
+            else
+            {
+                this.WindowState = WindowState.Maximized;
+                if (maximizeIcon != null)
+                    maximizeIcon.Data = Geometry.Parse("M 0,2 H 8 V 10 H 0 Z M 2,0 H 10 V 8 H 8 V 2 H 2 Z");
+            }
+        }
         private void CreateNewTab()
         {
             try
