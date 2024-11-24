@@ -146,9 +146,20 @@ namespace CsBe_Browser_2._0
 
         private void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            _currentTab?.WebView.Reload();
-        }
+            if (_currentTab == null) return;
 
+            // Only reload if we're on an actual webpage (not the home panel)
+            if (_currentTab.WebView.Visibility == Visibility.Visible && _currentTab.WebView.Source != null && _currentTab.WebView.Source.ToString() != "about:blank")
+            {
+                _currentTab.WebView.Reload();
+            }
+            // If we're on the home panel, just ensure it's visible
+            else if (_currentTab.HomePanel.Visibility == Visibility.Visible)
+            {
+                // No need to reload - home panel is static content
+                return;
+            }
+        }
         private void HomeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentTab != null)
