@@ -37,6 +37,12 @@ namespace CsBe_Browser_2._0
             _tabs = new List<BrowserTab>();
             CreateNewTab();
         }
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            ThemeManager.CurrentTheme = ThemeManager.CurrentTheme == ThemeManager.Theme.Light
+                ? ThemeManager.Theme.Dark
+                : ThemeManager.Theme.Light;
+        }
 
         // Add these window control methods
         private void TopBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -7,54 +7,57 @@
         xmlns:local="clr-namespace:CsBe_Browser_2._0"
         mc:Ignorable="d"
         Title="CsBe Browser 2.0" Height="750" Width="1000"
-        Background="#f0f2f5"
+ Background="{DynamicResource BackgroundColor}"
         WindowStyle="None" 
         ResizeMode="CanResize"
         AllowsTransparency="False">
     <Window.Resources>
         <Style x:Key="ModernButton" TargetType="{x:Type Button}">
-            <Setter Property="Background" Value="#ffffff"/>
-            <Setter Property="Foreground" Value="#1a1a1a"/>
+            <Setter Property="Background" Value="{DynamicResource TabBackgroundColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#e8eaed"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="Margin" Value="3"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                    VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#e8eaed"/>
+                    <Setter Property="Background" Value="{DynamicResource TabHoverColor}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
-
+        <!-- Inside Window.Resources -->
+        
         <Style x:Key="SearchTextBox" TargetType="{x:Type TextBox}">
-            <Setter Property="Background" Value="#ffffff"/>
-            <Setter Property="Foreground" Value="#1a1a1a"/>
+            <Setter Property="Background" Value="{DynamicResource SearchBarBackgroundColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource ForegroundColor}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#e8eaed"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="7,0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type TextBox}">
                         <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="20">
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="20">
                             <ScrollViewer x:Name="PART_ContentHost" 
-                                        VerticalAlignment="Center"
-                                        Margin="{TemplateBinding Padding}"/>
+                                VerticalAlignment="Center"
+                                Margin="{TemplateBinding Padding}"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -62,10 +65,10 @@
         </Style>
 
         <Style x:Key="TabButton" TargetType="{x:Type Button}">
-            <Setter Property="Background" Value="#ffffff"/>
-            <Setter Property="Foreground" Value="#1a1a1a"/>
+            <Setter Property="Background" Value="{DynamicResource TabBackgroundColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#e8eaed"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="2,4,0,4"/>
             <Setter Property="MinWidth" Value="120"/>
@@ -76,44 +79,45 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Border x:Name="border" 
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="16">
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="16">
                             <DockPanel LastChildFill="False">
                                 <TextBlock DockPanel.Dock="Left"
-                                         Text="Neuer Tab" 
-                                         Margin="12,0,0,0"
-                                         TextTrimming="CharacterEllipsis"
-                                         VerticalAlignment="Center"
-                                         FontSize="11"
-                                         FontFamily="Segoe UI"
-                                         Foreground="{TemplateBinding Foreground}"/>
+                                 Text="Neuer Tab" 
+                                 Margin="12,0,0,0"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center"
+                                 FontSize="11"
+                                 FontFamily="Segoe UI"
+                                 Foreground="{TemplateBinding Foreground}"/>
                                 <Button DockPanel.Dock="Right"
-                                        Content="×" 
-                                        VerticalAlignment="Center"
-                                        Margin="0,0,4,0"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Padding="2"
-                                        FontSize="14"
-                                        Width="16"
-                                        Height="16"
-                                        Foreground="#5f6368"
-                                        Cursor="Hand"
-                                        Tag="{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type Button}}}">
+                                Content="×" 
+                                VerticalAlignment="Center"
+                                Margin="0,0,4,0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="2"
+                                FontSize="14"
+                                Width="16"
+                                Height="16"
+                                Foreground="{DynamicResource ForegroundColor}"
+                                Cursor="Hand"
+                                Tag="{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type Button}}}">
                                     <Button.Template>
                                         <ControlTemplate TargetType="{x:Type Button}">
                                             <Border x:Name="closeBorder" 
-                                                    Background="Transparent" 
-                                                    CornerRadius="8">
+                                            Background="Transparent" 
+                                            CornerRadius="8">
                                                 <TextBlock Text="×" 
-                                                         HorizontalAlignment="Center" 
-                                                         VerticalAlignment="Center"/>
+                                                 Foreground="{DynamicResource ForegroundColor}"
+                                                 HorizontalAlignment="Center" 
+                                                 VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="closeBorder" Property="Background" Value="#e8eaed"/>
+                                                    <Setter TargetName="closeBorder" Property="Background" Value="{DynamicResource TabHoverColor}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -123,50 +127,48 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#f5f5f5"/>
+                                <Setter Property="Background" Value="{DynamicResource TabHoverColor}"/>
                             </Trigger>
                             <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                <Setter Property="Background" Value="#ffffff"/>
-                                <Setter Property="BorderBrush" Value="#e8eaed"/>
-                                <Setter Property="Foreground" Value="#202124"/>
+                                <Setter Property="Background" Value="{DynamicResource TabBackgroundColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
                             </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
+        
         <!-- Window Control Buttons Style -->
         <Style x:Key="WindowControlButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#5f6368"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
-            <!-- Added this -->
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border" 
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        VerticalAlignment="Stretch">
-                            <!-- Added this -->
+                       Background="{TemplateBinding Background}"
+                       BorderBrush="{TemplateBinding BorderBrush}"
+                       BorderThickness="{TemplateBinding BorderThickness}"
+                       VerticalAlignment="Stretch">
                             <ContentPresenter HorizontalAlignment="Center" 
                                     VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#e8eaed"/>
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource TabHoverColor}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
+        
         <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
@@ -192,7 +194,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid Background="{DynamicResource BackgroundColor}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -200,40 +202,41 @@
         </Grid.RowDefinitions>
 
         <!-- Tab Bar -->
-        <Border Background="#f8f9fa" 
-                BorderThickness="0,0,0,1" 
-                BorderBrush="#e8eaed"
-                Padding="4,0,0,0"
-                MouseLeftButtonDown="TopBar_MouseLeftButtonDown">
+        <Border Background="{DynamicResource TabBackgroundColor}" 
+        BorderThickness="0,0,0,1" 
+        BorderBrush="{DynamicResource BorderColor}"
+        Padding="4,0,0,0"
+        MouseLeftButtonDown="TopBar_MouseLeftButtonDown">
             <DockPanel>
                 <Button Width="32"
-                        Height="32"
-                        Margin="2,4,0,4"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        FontSize="18"
-                        Foreground="#5f6368"
-                        Click="NewTab_Click"
-                        Cursor="Hand"
-                        DockPanel.Dock="Left">
+        Height="32"
+        Margin="2,4,0,4"
+        Background="Transparent"
+        BorderThickness="0"
+        FontSize="18"
+        Foreground="{DynamicResource ForegroundColor}"
+        Click="NewTab_Click"
+        Cursor="Hand"
+        DockPanel.Dock="Left">
                     <Button.Template>
                         <ControlTemplate TargetType="{x:Type Button}">
                             <Border x:Name="border" 
-                                    Background="Transparent" 
-                                    CornerRadius="14">
+                    Background="Transparent" 
+                    CornerRadius="14">
                                 <TextBlock Text="+" 
-                                         HorizontalAlignment="Center" 
-                                         VerticalAlignment="Center"/>
+                         Foreground="{DynamicResource ForegroundColor}"
+                         HorizontalAlignment="Center" 
+                         VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="border" Property="Background" Value="#e8eaed"/>
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource TabHoverColor}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
-
+                
                 <StackPanel x:Name="TabsPanel" 
                            Orientation="Horizontal"
                            DockPanel.Dock="Left"/>
@@ -280,28 +283,44 @@
 
         <!-- Navigation Bar -->
         <Border Grid.Row="1"
-                Background="#ffffff" 
-                BorderThickness="0,0,0,1" 
-                BorderBrush="#e8eaed"
-                Padding="8">
+        Background="{DynamicResource TabBackgroundColor}" 
+        BorderThickness="0,0,0,1" 
+        BorderBrush="{DynamicResource BorderColor}"
+        Padding="8">
             <DockPanel Height="40">
                 <Button x:Name="BackButton" Content="←" Style="{StaticResource ModernButton}" 
-                        FontSize="16" Width="35" Click="BackButton_Click"
-                        BorderThickness="0" DockPanel.Dock="Left"/>
+                FontSize="16" Width="35" Click="BackButton_Click"
+                BorderThickness="0" DockPanel.Dock="Left"/>
                 <Button x:Name="ForwardButton" Content="→" Style="{StaticResource ModernButton}" 
-                        FontSize="16" Width="35" Click="ForwardButton_Click"
-                        BorderThickness="0" DockPanel.Dock="Left"/>
+                FontSize="16" Width="35" Click="ForwardButton_Click"
+                BorderThickness="0" DockPanel.Dock="Left"/>
                 <Button x:Name="RefreshButton" Content="↻" Style="{StaticResource ModernButton}" 
-                        FontSize="16" Width="35" Click="RefreshButton_Click"
-                        BorderThickness="0" DockPanel.Dock="Left"/>
+                FontSize="16" Width="35" Click="RefreshButton_Click"
+                BorderThickness="0" DockPanel.Dock="Left"/>
                 <Button x:Name="HomeButton" Content="⌂" Style="{StaticResource ModernButton}" 
-                        FontSize="16" Width="35" Click="HomeButton_Click"
-                        BorderThickness="0" DockPanel.Dock="Left"/>
+                FontSize="16" Width="35" Click="HomeButton_Click"
+                BorderThickness="0" DockPanel.Dock="Left"/>
+                <Button x:Name="ThemeToggleButton" 
+                Style="{StaticResource ModernButton}"
+                FontSize="16" 
+                Width="35"
+                Click="ThemeToggleButton_Click"
+                BorderThickness="0" 
+                DockPanel.Dock="Right"
+                Margin="3,0,0,0">
+                    <Path x:Name="ThemeIcon"
+                  Data="M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36c-0.98,1.37-2.58,2.26-4.4,2.26 c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"
+                  Fill="{DynamicResource ForegroundColor}"
+                  Width="16"
+                  Height="16"
+                  Stretch="Uniform"/>
+                </Button>
                 <TextBox x:Name="AddressBar" Style="{StaticResource SearchTextBox}"
-                         Margin="8,0" KeyDown="AddressBar_KeyDown" TextChanged="AddressBar_TextChanged"/>
+                 Height="32"
+                 Margin="8,0" KeyDown="AddressBar_KeyDown" TextChanged="AddressBar_TextChanged"/>
             </DockPanel>
         </Border>
-
+        
         <!-- Content Area -->
         <Grid x:Name="ContentArea" Grid.Row="2"/>
     </Grid>

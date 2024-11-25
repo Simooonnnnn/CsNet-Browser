@@ -644,7 +644,7 @@ namespace CsBe_Browser_2._0
         }
         private Grid CreateHomePanel()
         {
-            var grid = new Grid { Background = Brushes.White };
+            var grid = new Grid { Background = Brushes.Transparent };
             var stackPanel = new StackPanel
             {
                 VerticalAlignment = VerticalAlignment.Center,
@@ -654,81 +654,40 @@ namespace CsBe_Browser_2._0
 
             var logoViewbox = new Viewbox
             {
-                Height = 75,
-                Width = 282,
+                Height = 96,
+                Width = 360,
                 Stretch = Stretch.Uniform,
                 Margin = new Thickness(0, 0, 0, 30)
             };
 
-            var logoPath1 = new Path
+            // Create both light and dark mode logos
+            var lightModeLogo = CreateLightModeLogo();
+            var darkModeLogo = CreateDarkModeLogo();
+
+            // Initially set the correct logo based on theme
+            var initialLogo = ThemeManager.CurrentTheme == ThemeManager.Theme.Dark ? darkModeLogo : lightModeLogo;
+            logoViewbox.Child = initialLogo;
+
+            // Subscribe to theme changes
+            ThemeManager.ThemeChanged += (s, theme) =>
             {
-                Data = Geometry.Parse("M207 64.2857C207 58.3684 211.797 53.5714 217.714 53.5714H254.619C260.537 53.5714 265.333 58.3684 265.333 64.2857C265.333 70.203 260.537 75 254.619 75H217.714C211.797 75 207 70.203 207 64.2857Z"),
-                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#180102"))
+                logoViewbox.Child = theme == ThemeManager.Theme.Dark ? darkModeLogo : lightModeLogo;
             };
 
-            var logoPath2 = new Path
-            {
-                Data = Geometry.Parse("M207 10.7143C207 4.79695 211.797 0 217.714 0H254.619C260.537 0 265.333 4.79695 265.333 10.7143C265.333 16.6316 260.537 21.4286 254.619 21.4286H217.714C211.797 21.4286 207 16.6316 207 10.7143Z"),
-                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FCD202"))
-            };
+            stackPanel.Children.Add(logoViewbox);
 
-            var logoPath3 = new Path
-            {
-                Data = Geometry.Parse("M223.667 36.9048C223.667 30.9874 228.464 26.1905 234.381 26.1905H271.286C277.203 26.1905 282 30.9874 282 36.9048C282 42.8221 277.203 47.619 271.286 47.619H234.381C228.464 47.619 223.667 42.8221 223.667 36.9048Z"),
-                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E61F11"))
-            };
-
-            var logoPath4 = new Path
-            {
-                Data = Geometry.Parse("M0.368164 36.664C0.368164 32.312 1.37083 28.408 3.37616 24.952C5.42416 21.496 8.17616 18.808 11.6322 16.888C15.1308 14.9253 18.9495 13.944 23.0882 13.944C27.8242 13.944 32.0268 15.1173 35.6962 17.464C39.4082 19.768 42.0962 23.0533 43.7602 27.32H34.9922C33.8402 24.9733 32.2402 23.224 30.1922 22.072C28.1442 20.92 25.7762 20.344 23.0882 20.344C20.1442 20.344 17.5202 21.0053 15.2162 22.328C12.9122 23.6507 11.0988 25.5493 9.77617 28.024C8.49616 30.4987 7.85616 33.3787 7.85616 36.664C7.85616 39.9493 8.49616 42.8293 9.77617 45.304C11.0988 47.7787 12.9122 49.6987 15.2162 51.064C17.5202 52.3867 20.1442 53.048 23.0882 53.048C25.7762 53.048 28.1442 52.472 30.1922 51.32C32.2402 50.168 33.8402 48.4187 34.9922 46.072H43.7602C42.0962 50.3387 39.4082 53.624 35.6962 55.928C32.0268 58.232 27.8242 59.384 23.0882 59.384C18.9068 59.384 15.0882 58.424 11.6322 56.504C8.17616 54.5413 5.42416 51.832 3.37616 48.376C1.37083 44.92 0.368164 41.016 0.368164 36.664Z"),
-                Fill = new SolidColorBrush(Colors.Black)
-            };
-
-            var logoPath5 = new Path
-            {
-                Data = Geometry.Parse("M65.1002 59.576C62.3268 59.576 59.8308 59.0853 57.6122 58.104C55.4362 57.08 53.7082 55.7147 52.4282 54.008C51.1482 52.2587 50.4655 50.3173 50.3802 48.184H57.9322C58.0602 49.6773 58.7642 50.936 60.0442 51.96C61.3668 52.9413 63.0095 53.432 64.9722 53.432C67.0202 53.432 68.5988 53.048 69.7082 52.28C70.8602 51.4693 71.4362 50.4453 71.4362 49.208C71.4362 47.8853 70.7962 46.904 69.5162 46.264C68.2788 45.624 66.2948 44.92 63.5642 44.152C60.9188 43.4267 58.7642 42.7227 57.1002 42.04C55.4362 41.3573 53.9855 40.312 52.7482 38.904C51.5535 37.496 50.9562 35.64 50.9562 33.336C50.9562 31.4587 51.5108 29.752 52.6202 28.216C53.7295 26.6373 55.3082 25.4 57.3562 24.504C59.4468 23.608 61.8362 23.16 64.5242 23.16C68.5348 23.16 71.7562 24.184 74.1882 26.232C76.6628 28.2373 77.9855 30.9893 78.1562 34.488H70.8602C70.7322 32.9093 70.0922 31.6507 68.9402 30.712C67.7882 29.7733 66.2308 29.304 64.2682 29.304C62.3482 29.304 60.8762 29.6667 59.8522 30.392C58.8282 31.1173 58.3162 32.0773 58.3162 33.272C58.3162 34.2107 58.6575 35 59.3402 35.64C60.0228 36.28 60.8548 36.792 61.8362 37.176C62.8175 37.5173 64.2682 37.9653 66.1882 38.52C68.7482 39.2027 70.8388 39.9067 72.4602 40.632C74.1242 41.3147 75.5535 42.3387 76.7482 43.704C77.9428 45.0693 78.5615 46.8827 78.6042 49.144C78.6042 51.1493 78.0495 52.9413 76.9402 54.52C75.8308 56.0987 74.2522 57.336 72.2042 58.232C70.1988 59.128 67.8308 59.576 65.1002 59.576Z"),
-                Fill = new SolidColorBrush(Colors.Black)
-            };
-
-            var logoPath6 = new Path
-            {
-                Data = Geometry.Parse("M123.032 59H115.736L93.7837 25.784V59H86.4877V14.456H93.7837L115.736 47.608V14.456H123.032V59Z"),
-                Fill = new SolidColorBrush(Colors.Black)
-            };
-
-            var logoPath7 = new Path
-            {
-                Data = Geometry.Parse("M164.933 40.504C164.933 41.8267 164.847 43.0213 164.677 44.088H137.733C137.946 46.904 138.991 49.1653 140.869 50.872C142.746 52.5787 145.05 53.432 147.781 53.432C151.706 53.432 154.479 51.7893 156.101 48.504H163.973C162.906 51.7467 160.965 54.4133 158.149 56.504C155.375 58.552 151.919 59.576 147.781 59.576C144.41 59.576 141.381 58.8293 138.693 57.336C136.047 55.8 133.957 53.6667 132.421 50.936C130.927 48.1627 130.181 44.9627 130.181 41.336C130.181 37.7093 130.906 34.5307 132.357 31.8C133.85 29.0267 135.919 26.8933 138.565 25.4C141.253 23.9067 144.325 23.16 147.781 23.16C151.109 23.16 154.074 23.8853 156.677 25.336C159.279 26.7867 161.306 28.8347 162.757 31.48C164.207 34.0827 164.933 37.0907 164.933 40.504ZM157.317 38.2C157.274 35.512 156.314 33.3573 154.437 31.736C152.559 30.1147 150.234 29.304 147.461 29.304C144.943 29.304 142.789 30.1147 140.997 31.736C139.205 33.3147 138.138 35.4693 137.797 38.2H157.317Z"),
-                Fill = new SolidColorBrush(Colors.Black)
-            };
-
-            var logoPath8 = new Path
-            {
-                Data = Geometry.Parse("M180.625 29.688V49.208C180.625 50.5307 180.923 51.4907 181.521 52.088C182.161 52.6427 183.227 52.92 184.721 52.92H189.201V59H183.441C180.155 59 177.638 58.232 175.889 56.696C174.139 55.16 173.265 52.664 173.265 49.208V29.688H169.105V23.736H173.265V14.968H180.625V23.736H189.201V29.688H180.625Z"),
-                Fill = new SolidColorBrush(Colors.Black)
-            };
-
-            var canvas = new Canvas { Width = 282, Height = 75 };
-            canvas.Children.Add(logoPath1);
-            canvas.Children.Add(logoPath2);
-            canvas.Children.Add(logoPath3);
-            canvas.Children.Add(logoPath4);
-            canvas.Children.Add(logoPath5);
-            canvas.Children.Add(logoPath6);
-            canvas.Children.Add(logoPath7);
-            canvas.Children.Add(logoPath8);
-
-            logoViewbox.Child = canvas;
             var searchBorder = new Border
             {
-                Background = Brushes.White,
+                Background = Application.Current.Resources["TabBackgroundColor"] as SolidColorBrush,
                 BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(
-                    (Color)ColorConverter.ConvertFromString("#e8eaed")),
+                BorderBrush = Application.Current.Resources["BorderColor"] as SolidColorBrush,
                 CornerRadius = new CornerRadius(24),
                 Width = 550,
                 Margin = new Thickness(0, 0, 0, 20)
             };
+
+            searchBorder.Background = Application.Current.Resources["TabBackgroundColor"] as SolidColorBrush;
+            searchBorder.BorderBrush = Application.Current.Resources["BorderColor"] as SolidColorBrush;
 
             SearchBox = new TextBox();
             SearchBox.SetResourceReference(FrameworkElement.StyleProperty, "SearchTextBox");
@@ -737,6 +696,8 @@ namespace CsBe_Browser_2._0
             SearchBox.BorderThickness = new Thickness(1);
             SearchBox.Text = "Das Web durchsuchen";
             SearchBox.Foreground = Brushes.Gray;
+            SearchBox.SetResourceReference(TextBox.BackgroundProperty, "SearchBarBackgroundColor");
+            SearchBox.SetResourceReference(TextBox.BorderBrushProperty, "BorderColor");
 
             var buttonsPanel = new StackPanel
             {
@@ -752,6 +713,8 @@ namespace CsBe_Browser_2._0
             csbeButton.Height = 40;
             csbeButton.FontSize = 14;
             csbeButton.Margin = new Thickness(0, 0, 15, 0);
+            csbeButton.SetResourceReference(Button.BackgroundProperty, "TabBackgroundColor");
+            csbeButton.SetResourceReference(Button.ForegroundProperty, "ForegroundColor");
 
             var csnetButton = new Button();
             csnetButton.SetResourceReference(FrameworkElement.StyleProperty, "ModernButton");
@@ -759,6 +722,8 @@ namespace CsBe_Browser_2._0
             csnetButton.Width = 160;
             csnetButton.Height = 40;
             csnetButton.FontSize = 14;
+            csnetButton.SetResourceReference(Button.BackgroundProperty, "TabBackgroundColor");
+            csnetButton.SetResourceReference(Button.ForegroundProperty, "ForegroundColor");
 
             SearchBox.GotFocus += SearchBox_GotFocus;
             SearchBox.LostFocus += SearchBox_LostFocus;
@@ -770,7 +735,6 @@ namespace CsBe_Browser_2._0
             buttonsPanel.Children.Add(csbeButton);
             buttonsPanel.Children.Add(csnetButton);
 
-            stackPanel.Children.Add(logoViewbox);
             stackPanel.Children.Add(searchBorder);
             stackPanel.Children.Add(buttonsPanel);
 
@@ -779,12 +743,122 @@ namespace CsBe_Browser_2._0
             return grid;
         }
 
+        private Canvas CreateLightModeLogo()
+        {
+            var canvas = new Canvas { Width = 284, Height = 96 };
+
+            // Create the text path
+            var textPath = new Path
+            {
+                Data = Geometry.Parse("M2.368 47.664C2.368 43.312 3.37067 39.408 5.376 35.952C7.424 32.496 10.176 29.808 13.632 27.888C17.1307 25.9253 20.9493 24.944 25.088 24.944C29.824 24.944 34.0267 26.1173 37.696 28.464C41.408 30.768 44.096 34.0533 45.76 38.32H36.992C35.84 35.9733 34.24 34.224 32.192 33.072C30.144 31.92 27.776 31.344 25.088 31.344C22.144 31.344 19.52 32.0053 17.216 33.328C14.912 34.6507 13.0987 36.5493 11.776 39.024C10.496 41.4987 9.856 44.3787 9.856 47.664C9.856 50.9493 10.496 53.8293 11.776 56.304C13.0987 58.7787 14.912 60.6987 17.216 62.064C19.52 63.3867 22.144 64.048 25.088 64.048C27.776 64.048 30.144 63.472 32.192 62.32C34.24 61.168 35.84 59.4187 36.992 57.072H45.76C44.096 61.3387 41.408 64.624 37.696 66.928C34.0267 69.232 29.824 70.384 25.088 70.384C20.9067 70.384 17.088 69.424 13.632 67.504C10.176 65.5413 7.424 62.832 5.376 59.376C3.37067 55.92 2.368 52.016 2.368 47.664Z"),
+                Fill = new SolidColorBrush(Colors.Black)
+            };
+
+            // Yellow rectangle
+            var rect1 = new Rectangle
+            {
+                Width = 59,
+                Height = 22,
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FCD202")),
+                RadiusX = 11,
+                RadiusY = 11
+            };
+            Canvas.SetLeft(rect1, 209);
+            Canvas.SetTop(rect1, 10);
+
+            // Red rectangle
+            var rect2 = new Rectangle
+            {
+                Width = 59,
+                Height = 22,
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E61F11")),
+                RadiusX = 11,
+                RadiusY = 11
+            };
+            Canvas.SetLeft(rect2, 225);
+            Canvas.SetTop(rect2, 37);
+
+            // Dark rectangle
+            var rect3 = new Rectangle
+            {
+                Width = 59,
+                Height = 22,
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#180102")),
+                RadiusX = 11,
+                RadiusY = 11
+            };
+            Canvas.SetLeft(rect3, 209);
+            Canvas.SetTop(rect3, 64);
+
+            canvas.Children.Add(textPath);
+            canvas.Children.Add(rect1);
+            canvas.Children.Add(rect2);
+            canvas.Children.Add(rect3);
+
+            return canvas;
+        }
+
+        private Canvas CreateDarkModeLogo()
+        {
+            var canvas = new Canvas { Width = 284, Height = 96 };
+
+            // Create the complete text path for "CsNet"
+            var textPath = new Path
+            {
+                Data = Geometry.Parse("M2.368 47.664C2.368 43.312 3.37067 39.408 5.376 35.952C7.424 32.496 10.176 29.808 13.632 27.888C17.1307 25.9253 20.9493 24.944 25.088 24.944C29.824 24.944 34.0267 26.1173 37.696 28.464C41.408 30.768 44.096 34.0533 45.76 38.32H36.992C35.84 35.9733 34.24 34.224 32.192 33.072C30.144 31.92 27.776 31.344 25.088 31.344C22.144 31.344 19.52 32.0053 17.216 33.328C14.912 34.6507 13.0987 36.5493 11.776 39.024C10.496 41.4987 9.856 44.3787 9.856 47.664C9.856 50.9493 10.496 53.8293 11.776 56.304C13.0987 58.7787 14.912 60.6987 17.216 62.064C19.52 63.3867 22.144 64.048 25.088 64.048C27.776 64.048 30.144 63.472 32.192 62.32C34.24 61.168 35.84 59.4187 36.992 57.072H45.76C44.096 61.3387 41.408 64.624 37.696 66.928C34.0267 69.232 29.824 70.384 25.088 70.384C20.9067 70.384 17.088 69.424 13.632 67.504C10.176 65.5413 7.424 62.832 5.376 59.376C3.37067 55.92 2.368 52.016 2.368 47.664ZM67.1 70.576C64.3267 70.576 61.8307 70.0853 59.612 69.104C57.436 68.08 55.708 66.7147 54.428 65.008C53.148 63.2587 52.4653 61.3173 52.38 59.184H59.932C60.06 60.6773 60.764 61.936 62.044 62.96C63.3667 63.9413 65.0093 64.432 66.972 64.432C69.02 64.432 70.5987 64.048 71.708 63.28C72.86 62.4693 73.436 61.4453 73.436 60.208C73.436 58.8853 72.796 57.904 71.516 57.264C70.2787 56.624 68.2947 55.92 65.564 55.152C62.9187 54.4267 60.764 53.7227 59.1 53.04C57.436 52.3573 55.9853 51.312 54.748 49.904C53.5533 48.496 52.956 46.64 52.956 44.336C52.956 42.4587 53.5107 40.752 54.62 39.216C55.7293 37.6373 57.308 36.4 59.356 35.504C61.4467 34.608 63.836 34.16 66.524 34.16C70.5347 34.16 73.756 35.184 76.188 37.232C78.6627 39.2373 79.9853 41.9893 80.156 45.488H72.86C72.732 43.9093 72.092 42.6507 70.94 41.712C69.788 40.7733 68.2307 40.304 66.268 40.304C64.348 40.304 62.876 40.6667 61.852 41.392C60.828 42.1173 60.316 43.0773 60.316 44.272C60.316 45.2107 60.6573 46 61.34 46.64C62.0227 47.28 62.8547 47.792 63.836 48.176C64.8173 48.5173 66.268 48.9653 68.188 49.52C70.748 50.2027 72.8387 50.9067 74.46 51.632C76.124 52.3147 77.5533 53.3387 78.748 54.704C79.9427 56.0693 80.5613 57.8827 80.604 60.144C80.604 62.1493 80.0493 63.9413 78.94 65.52C77.8307 67.0987 76.252 68.336 74.204 69.232C72.1987 70.128 69.8307 70.576 67.1 70.576ZM125.032 70H117.736L95.7835 36.784V70H88.4875V25.456H95.7835L117.736 58.608V25.456H125.032V70ZM166.933 51.504C166.933 52.8267 166.847 54.0213 166.677 55.088H139.733C139.946 57.904 140.991 60.1653 142.869 61.872C144.746 63.5787 147.05 64.432 149.781 64.432C153.706 64.432 156.479 62.7893 158.101 59.504H165.972C164.906 62.7467 162.965 65.4133 160.149 67.504C157.375 69.552 153.919 70.576 149.781 70.576C146.41 70.576 143.381 69.8293 140.693 68.336C138.047 66.8 135.957 64.6667 134.421 61.936C132.927 59.1627 132.181 55.9627 132.181 52.336C132.181 48.7093 132.906 45.5307 134.357 42.8C135.85 40.0267 137.919 37.8933 140.565 36.4C143.253 34.9067 146.325 34.16 149.781 34.16C153.109 34.16 156.074 34.8853 158.677 36.336C161.279 37.7867 163.306 39.8347 164.757 42.48C166.207 45.0827 166.933 48.0907 166.933 51.504ZM159.317 49.2C159.274 46.512 158.314 44.3573 156.437 42.736C154.559 41.1147 152.234 40.304 149.461 40.304C146.943 40.304 144.789 41.1147 142.997 42.736C141.205 44.3147 140.138 46.4693 139.797 49.2H159.317ZM182.625 40.688V60.208C182.625 61.5307 182.923 62.4907 183.521 63.088C184.161 63.6427 185.227 63.92 186.721 63.92H191.201V70H185.441C182.155 70 179.638 69.232 177.889 67.696C176.139 66.16 175.265 63.664 175.265 60.208V40.688H171.105V34.736H175.265V25.968H182.625V34.736H191.201V40.688H182.625Z"),
+                Fill = new SolidColorBrush(Colors.White)
+            };
+
+            // Light purple rectangle
+            var rect1 = new Rectangle
+            {
+                Width = 59,
+                Height = 22,
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#BCB8FF")),
+                RadiusX = 11,
+                RadiusY = 11
+            };
+            Canvas.SetLeft(rect1, 209);
+            Canvas.SetTop(rect1, 10);
+
+            // Medium purple rectangle
+            var rect2 = new Rectangle
+            {
+                Width = 59,
+                Height = 22,
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8563FF")),
+                RadiusX = 11,
+                RadiusY = 11
+            };
+            Canvas.SetLeft(rect2, 225);
+            Canvas.SetTop(rect2, 37);
+
+            // Dark purple rectangle
+            var rect3 = new Rectangle
+            {
+                Width = 59,
+                Height = 22,
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6200FF")),
+                RadiusX = 11,
+                RadiusY = 11
+            };
+            Canvas.SetLeft(rect3, 209);
+            Canvas.SetTop(rect3, 64);
+
+            canvas.Children.Add(textPath);
+            canvas.Children.Add(rect1);
+            canvas.Children.Add(rect2);
+            canvas.Children.Add(rect3);
+
+            return canvas;
+        }
+
         private void SearchBox_GotFocus(object sender, RoutedEventArgs e)
         {
             if (SearchBox.Text == "Das Web durchsuchen")
             {
                 SearchBox.Text = string.Empty;
-                SearchBox.Foreground = Brushes.Black;
+                SearchBox.Foreground = Application.Current.Resources["ForegroundColor"] as SolidColorBrush;
             }
         }
 
@@ -793,7 +867,7 @@ namespace CsBe_Browser_2._0
             if (string.IsNullOrWhiteSpace(SearchBox.Text))
             {
                 SearchBox.Text = "Das Web durchsuchen";
-                SearchBox.Foreground = Brushes.Gray;
+                SearchBox.Foreground = new SolidColorBrush(Colors.Gray);
             }
         }
 
