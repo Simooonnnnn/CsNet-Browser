@@ -629,17 +629,17 @@ namespace CsBe_Browser_2._0
         {
             if (IsSelected)
             {
-                TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ffffff"));
-                TabButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed"));
+                TabButton.SetResourceReference(Button.BackgroundProperty, "TabBackgroundColor");
+                TabButton.SetResourceReference(Button.BorderBrushProperty, "BorderColor");
                 var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
-                titleBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202124"));
+                titleBlock.SetResourceReference(TextBlock.ForegroundProperty, "ForegroundColor");
             }
             else
             {
-                TabButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ffffff"));
-                TabButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed"));
+                TabButton.SetResourceReference(Button.BackgroundProperty, "TabBackgroundColor");
+                TabButton.SetResourceReference(Button.BorderBrushProperty, "BorderColor");
                 var titleBlock = ((DockPanel)TabButton.Content).Children.OfType<TextBlock>().First();
-                titleBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368"));
+                titleBlock.SetResourceReference(TextBlock.ForegroundProperty, "ForegroundColor");
             }
         }
         private Grid CreateHomePanel()
@@ -678,9 +678,9 @@ namespace CsBe_Browser_2._0
 
             var searchBorder = new Border
             {
-                Background = Application.Current.Resources["TabBackgroundColor"] as SolidColorBrush,
-                BorderThickness = new Thickness(1),
-                BorderBrush = Application.Current.Resources["BorderColor"] as SolidColorBrush,
+                Background = Application.Current.Resources["SearchBarBackgroundColor"] as SolidColorBrush,
+                BorderThickness = new Thickness(0), // Changed to 0
+                BorderBrush = null,
                 CornerRadius = new CornerRadius(24),
                 Width = 550,
                 Margin = new Thickness(0, 0, 0, 20)
