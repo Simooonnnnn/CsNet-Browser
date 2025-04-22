@@ -3,6 +3,11 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+CsBe Browser 2.0/Models/*.gguf
+bin/
+obj/
+.vs/
+
 # User-specific files
 *.rsuser
 *.suo

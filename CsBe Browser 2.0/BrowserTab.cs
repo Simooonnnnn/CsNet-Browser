@@ -60,6 +60,7 @@ namespace CsBe_Browser_2._0
             text = System.Text.RegularExpressions.Regex.Replace(text, @"[^\w\s\.,!?:;\-()]", "");
             return text.Trim();
         }
+        // Replace the existing PerformCsNetSearch method with this updated version
         private async Task PerformCsNetSearch(string query)
         {
             try
@@ -92,100 +93,181 @@ namespace CsBe_Browser_2._0
                     }
                 }
 
-                _httpClient.DefaultRequestHeaders.Clear();
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-
-                var techTerms = new[] { "apple", "iphone", "ipad", "mac", "macbook", "processor", "chip", "specs", "m1", "m2", "m3" };
-                bool isTechQuery = techTerms.Any(term => query.ToLower().Contains(term));
-
-
-                var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
-                var response = await _httpClient.GetStringAsync(searchUrl);
-                var doc = new HtmlDocument();
-                doc.LoadHtml(response);
-
-                var links = doc.DocumentNode
-                    .SelectNodes("//div[contains(@class, 'result__body')]//a[@class='result__url']")
-                    ?.Select(a => "https://" + a.InnerText.Trim())
-                    .Where(url => !string.IsNullOrWhiteSpace(url) &&
-                                 !ContainsUnwantedDomain(url))
-                    .Take(5)
-                    .ToList();
-
-                if (links == null || !links.Any())
-                {
-                    MessageBox.Show("No search results found.");
-                    return;
-                }
+                // Set custom search state
+                _isCustomSearch = true;
+                _customSearchQuery = query;
 
                 ShowProgressIndicator(query);
 
-                var contentPieces = new List<string>();
-                var sources = new HashSet<string>();
-
-                foreach (var link in links)
+                // Initialize the AI service if needed
+                try
                 {
-                    try
-                    {
-                        var pageContent = await _httpClient.GetStringAsync(link);
-                        var pageDoc = new HtmlDocument();
-                        pageDoc.LoadHtml(pageContent);
-
-                        // Remove unwanted nodes
-                        foreach (var node in pageDoc.DocumentNode.SelectNodes("//script|//style|//nav|//header|//footer|//aside|//iframe|//form|//*[contains(@class, 'cookie')]|//*[contains(@class, 'ad')]")?.ToList() ?? new List<HtmlNode>())
-                        {
-                            node.Remove();
-                        }
-
-                        sources.Add(new Uri(link).Host);
-
-                        var contentNodes = pageDoc.DocumentNode.SelectNodes("//article//p|//main//p|//div[contains(@class, 'content')]//p|//div[contains(@class, 'post')]//p");
-                        if (contentNodes != null)
-                        {
-                            var paragraphs = contentNodes
-                                .Select(node => CleanText(node.InnerText))
-                                .Where(text =>
-                                    text.Length > 50 &&
-                                    text.Length < 500 &&
-                                    !ContainsUnwantedContent(text) &&
-                                    IsRelevantToQuery(text, query))
-                                .ToList();
-
-                            // Score the paragraphs based on keyword relevance
-                            var scoredParagraphs = paragraphs.Select(p => new
-                            {
-                                Paragraph = p,
-                                Score = CalculateRelevanceScore(p, query) // New scoring function
-                            })
-                            .Where(x => x.Score > 0) // Only keep relevant paragraphs
-                            .OrderByDescending(x => x.Score) // Order by relevance
-                            .Select(x => x.Paragraph)
-                            .ToList();
-
-                            contentPieces.AddRange(scoredParagraphs);
-                        }
-                    }
-                    catch
-                    {
-                        continue;
-                    }
+                    await GemmaService.Instance.Initialize();
                 }
-                if (!contentPieces.Any())
+                catch (Exception ex)
                 {
-                    MessageBox.Show("Could not extract meaningful information from the sources.");
+                    MessageBox.Show($"Failed to initialize AI model: {ex.Message}");
                     return;
                 }
 
-                var results = new SearchResults();
-                results.AddContent(string.Join(", ", sources), contentPieces.Take(4).ToList());
+                // Optional: Still get some context from a web search to help inform the AI
+                var searchContext = new List<string>();
+                try
+                {
+                    _httpClient.DefaultRequestHeaders.Clear();
+                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
-                var htmlContent = GenerateFormattedOutput(query, results);
+                    var searchUrl = $"https://duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
+                    var response = await _httpClient.GetStringAsync(searchUrl);
+                    var doc = new HtmlDocument();
+                    doc.LoadHtml(response);
+
+                    var snippets = doc.DocumentNode
+                        .SelectNodes("//div[contains(@class, 'result__body')]//a[@class='result__snippet']")
+                        ?.Select(a => CleanText(a.InnerText))
+                        .Where(text => !string.IsNullOrWhiteSpace(text) && text.Length > 20)
+                        .Take(5)
+                        .ToList() ?? new List<string>();
+
+                    searchContext.AddRange(snippets);
+                }
+                catch
+                {
+                    // If web search fails, we can still proceed with just the AI
+                }
+
+                // Generate AI response
+                var aiResponse = await GemmaService.Instance.GenerateResponse(query, searchContext);
+
+                // Extract keypoints and keywords
+                GemmaService.Instance.ExtractKeypoints(aiResponse, out var keypoints, out var keywords);
+
+                // Generate HTML output
+                var htmlContent = GenerateAIFormattedOutput(query, aiResponse, keypoints, keywords);
                 WebView.NavigateToString(htmlContent);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Search error: {ex.Message}");
+                MessageBox.Show($"AI Search error: {ex.Message}");
             }
+        }
+
+        // Add this new method for generating the AI output HTML
+        private string GenerateAIFormattedOutput(string query, string aiResponse, List<string> keypoints, List<string> keywords)
+        {
+            var cleanKeypoints = keypoints.Count > 0 ? keypoints : ExtractBulletPoints(aiResponse);
+            var cleanKeywords = keywords.Count > 0 ? keywords : ExtractKeywords(aiResponse).Take(8).ToList();
+
+            var contentHtml = new System.Text.StringBuilder();
+
+            contentHtml.Append($@"
+        <div class='source-section'>
+            <h3>Gemma AI Analysis</h3>
+            <div class='keywords'>
+                <h4>Kernpunkte:</h4>
+                <ul>
+                    {string.Join("\n", cleanKeypoints
+                                                    .Take(5)
+                                                    .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
+                </ul>
+            </div>
+            <div class='keywords'>
+                <h4>Schlüsselwörter:</h4>
+                <div class='keyword-tags'>{string.Join(" ", cleanKeywords.Take(8).Select(k => $"<span class='keyword'>{WebUtility.HtmlEncode(k)}</span>"))}</div>
+            </div>
+            <div class='content'>
+                <p>{WebUtility.HtmlEncode(aiResponse).Replace("\n", "<br />")}</p>
+            </div>
+        </div>
+    ");
+
+            return $@"
+<html>
+<head>
+    <style>
+        body {{ 
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            padding: 2em;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            color: #000000;
+        }}
+        h2 {{ 
+            color: #180102;
+            font-size: 1.5em;
+            margin-bottom: 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 2px solid #f0f0f0;
+        }}
+        h4 {{
+            color: #180102;
+            font-size: 1.1em;
+            margin: 1em 0 0.5em 0;
+        }}
+        .source-section {{
+            background: #f8f9fa;
+            padding: 1.5em;
+            border-radius: 8px;
+            margin-bottom: 1em;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        h3 {{
+            color: #180102;
+            font-size: 1.2em;
+            margin-bottom: 0.5em;
+        }}
+        .keywords {{
+            margin: 1em 0;
+            padding: 1em;
+            background: #fff;
+            border-radius: 4px;
+        }}
+        .keyword-tags {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5em;
+        }}
+        .keyword {{
+            background: #f0f0f0;
+            color: #000000;
+            padding: 0.3em 0.8em;
+            border-radius: 1em;
+            font-size: 0.9em;
+            border: 1px solid #d0d0d0;
+        }}
+        ul {{
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }}
+        li {{
+            margin: 0.3em 0;
+            color: #000000;
+        }}
+        p {{
+            color: #000000;
+            font-size: 1.1em;
+            line-height: 1.8;
+            margin-bottom: 1em;
+        }}
+        .ai-badge {{
+            display: inline-block;
+            background: #6200FF;
+            color: white;
+            padding: 0.3em 0.8em;
+            border-radius: 1em;
+            font-size: 0.9em;
+            margin-left: 1em;
+            vertical-align: middle;
+        }}
+    </style>
+</head>
+<body>
+    <h2>Suchergebnisse für: {WebUtility.HtmlEncode(query)} <span class='ai-badge'>Gemma AI</span></h2>
+    {contentHtml}
+</body>
+</html>";
         }
         private int CalculateRelevanceScore(string text, string query)
         {

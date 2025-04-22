@@ -1,0 +1,4 @@
+﻿CsBe Browser 2.0/Models/*.gguf
+bin/
+obj/
+.vs/
