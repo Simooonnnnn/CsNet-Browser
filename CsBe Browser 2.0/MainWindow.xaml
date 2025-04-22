@@ -7,11 +7,13 @@
         xmlns:local="clr-namespace:CsBe_Browser_2._0"
         mc:Ignorable="d"
         Title="CsBe Browser 2.0" Height="750" Width="1000"
+        
  Background="{DynamicResource BackgroundColor}"
         WindowStyle="None" 
         ResizeMode="CanResize"
         AllowsTransparency="False">
     <Window.Resources>
+        
         <Style x:Key="ModernButton" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="{DynamicResource TabBackgroundColor}"/>
             <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
@@ -21,6 +23,7 @@
             <Setter Property="Margin" Value="3"/>
             <Setter Property="Template">
                 <Setter.Value>
+                    
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Border Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
@@ -290,6 +293,24 @@
                 <Button x:Name="ForwardButton" Content="→" Style="{StaticResource ModernButton}" 
                 FontSize="16" Width="35" Click="ForwardButton_Click"
                 BorderThickness="0" DockPanel.Dock="Left"/>
+                <!-- Partial update to MainWindow.xaml - Add this button before the ThemeToggleButton -->
+
+                <Button x:Name="ModelConfigButton" 
+        Style="{StaticResource ModernButton}"
+        FontSize="16" 
+        Width="35"
+        Click="ModelConfigButton_Click"
+        BorderThickness="0" 
+        DockPanel.Dock="Right"
+        Margin="3,0,0,0"
+        ToolTip="Configure AI Model">
+                    <Path x:Name="ModelIcon"
+          Data="M12 3.5C12 5.433 10.433 7 8.5 7C6.567 7 5 5.433 5 3.5C5 1.567 6.567 0 8.5 0C10.433 0 12 1.567 12 3.5ZM16 3.5C16 4.328 15.328 5 14.5 5C13.672 5 13 4.328 13 3.5C13 2.672 13.672 2 14.5 2C15.328 2 16 2.672 16 3.5ZM14.5 8C13.672 8 13 7.328 13 6.5C13 5.672 13.672 5 14.5 5C15.328 5 16 5.672 16 6.5C16 7.328 15.328 8 14.5 8ZM16 9.5C16 10.328 15.328 11 14.5 11C13.672 11 13 10.328 13 9.5C13 8.672 13.672 8 14.5 8C15.328 8 16 8.672 16 9.5ZM8.5 10C10.433 10 12 11.567 12 13.5C12 15.433 10.433 17 8.5 17C6.567 17 5 15.433 5 13.5C5 11.567 6.567 10 8.5 10Z"
+          Fill="{DynamicResource ForegroundColor}"
+          Width="16"
+          Height="16"
+          Stretch="Uniform"/>
+                </Button>
                 <Button x:Name="RefreshButton" Content="↻" Style="{StaticResource ModernButton}" 
                 FontSize="16" Width="35" Click="RefreshButton_Click"
                 BorderThickness="0" DockPanel.Dock="Left"/>

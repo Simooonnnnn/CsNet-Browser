@@ -249,6 +249,63 @@ namespace CsBe_Browser_2._0
                 _currentTab.Title = "Neuer Tab";
             }
         }
+
+        // Add this method to your MainWindow.xaml.cs class
+
+        private async void ModelConfigButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Ask if user wants to change the model
+            var result = MessageBox.Show(
+                "Do you want to change the AI model file?\n\n" +
+                "This will reset your current model selection and let you pick a new GGUF file.",
+                "Change AI Model",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    // Let the user select a new model
+                    await ModelSelector.ChangeModelFile();
+
+                    // Reset the GemmaService instance to force reloading the model
+                    var gemmaService = GemmaService.Instance;
+                    var field = typeof(GemmaService).GetField("_isInitialized",
+                        System.Reflection.BindingFlags.NonPublic |
+                        System.Reflection.BindingFlags.Instance);
+
+                    if (field != null)
+                    {
+                        field.SetValue(gemmaService, false);
+
+                        // Also reset the model field to free memory
+                        var modelField = typeof(GemmaService).GetField("_model",
+                            System.Reflection.BindingFlags.NonPublic |
+                            System.Reflection.BindingFlags.Instance);
+
+                        if (modelField != null)
+                        {
+                            modelField.SetValue(gemmaService, null);
+                        }
+
+                        MessageBox.Show(
+                            "AI model configuration updated. The new model will be loaded when you perform your next search.",
+                            "Model Changed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        $"Error changing model: {ex.Message}",
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            }
+        }
         private void NavigateToUrl(string input)
         {
             if (_currentTab == null) return;

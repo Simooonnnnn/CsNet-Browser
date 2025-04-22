@@ -12,10 +12,8 @@ namespace CsBe_Browser_2._0
             // Initialize theme manager
             ThemeManager.Initialize();
 
-            // Check for AI model and offer to download if needed
-            await Task.Run(async () => {
-                await ModelDownloader.EnsureModelExists();
-            });
+            // Check for AI model and offer to configure if needed
+            await ModelSelector.EnsureModelExists();
         }
     }
 }
