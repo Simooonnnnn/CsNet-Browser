@@ -61,6 +61,11 @@ namespace CsBe_Browser_2._0
             return text.Trim();
         }
         // Replace the existing PerformCsNetSearch method with this updated version
+        // Add this method to your BrowserTab.cs class
+
+        // Replace the existing PerformCsNetSearch method with this improved version
+        // Add this method to your BrowserTab.cs class - replace the existing PerformCsNetSearch method
+
         private async Task PerformCsNetSearch(string query)
         {
             try
@@ -99,18 +104,7 @@ namespace CsBe_Browser_2._0
 
                 ShowProgressIndicator(query);
 
-                // Initialize the AI service if needed
-                try
-                {
-                    await GemmaService.Instance.Initialize();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Failed to initialize AI model: {ex.Message}");
-                    return;
-                }
-
-                // Optional: Still get some context from a web search to help inform the AI
+                // Get search context from web
                 var searchContext = new List<string>();
                 try
                 {
@@ -131,28 +125,214 @@ namespace CsBe_Browser_2._0
 
                     searchContext.AddRange(snippets);
                 }
-                catch
+                catch (Exception ex)
                 {
                     // If web search fails, we can still proceed with just the AI
+                    Console.WriteLine($"Web search error: {ex.Message}");
                 }
 
-                // Generate AI response
-                var aiResponse = await GemmaService.Instance.GenerateResponse(query, searchContext);
+                // Variables to store AI results or fallback content
+                string aiResponse = "";
+                List<string> keypoints = new List<string>();
+                List<string> keywords = new List<string>();
+                bool aiSucceeded = false;
 
-                // Extract keypoints and keywords
-                GemmaService.Instance.ExtractKeypoints(aiResponse, out var keypoints, out var keywords);
+                try
+                {
+                    // Try to initialize AI
+                    await GemmaService.Instance.Initialize();
 
-                // Generate HTML output
-                var htmlContent = GenerateAIFormattedOutput(query, aiResponse, keypoints, keywords);
+                    // Generate AI response
+                    aiResponse = await GemmaService.Instance.GenerateResponse(query, searchContext);
+
+                    // Extract keypoints and keywords
+                    GemmaService.Instance.ExtractKeypoints(aiResponse, out keypoints, out keywords);
+                    aiSucceeded = true;
+                }
+                catch (Exception ex)
+                {
+                    // AI failed, fallback to showing web results directly
+                    aiResponse = "AI processing unavailable. Here are relevant search results:\n\n";
+
+                    if (searchContext.Count > 0)
+                    {
+                        foreach (var text in searchContext)
+                        {
+                            aiResponse += "• " + text + "\n\n";
+                        }
+                    }
+                    else
+                    {
+                        aiResponse += "No search results found. Try a different query.";
+                    }
+
+                    // Create simple keypoints from search context
+                    keypoints = searchContext.Take(3).ToList();
+                    if (keypoints.Count == 0)
+                    {
+                        keypoints.Add("No direct results for this query");
+                    }
+
+                    // Create keywords from the query itself
+                    keywords = query.Split(' ')
+                        .Where(w => w.Length > 3)
+                        .Take(5)
+                        .ToList();
+
+                    if (keywords.Count == 0)
+                    {
+                        keywords.Add("search");
+                    }
+
+                    aiSucceeded = false;
+                }
+
+                // Generate HTML output (works whether AI succeeded or not)
+                var htmlContent = GenerateAIFormattedOutput(query, aiResponse, keypoints, keywords, aiSucceeded);
                 WebView.NavigateToString(htmlContent);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"AI Search error: {ex.Message}");
+                MessageBox.Show($"Search error: {ex.Message}", "CsNet Search Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                // Show a basic error page
+                var errorHtml = $@"
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; padding: 2em; max-width: 800px; margin: 0 auto; }}
+        h2 {{ color: #d32f2f; }}
+        p {{ line-height: 1.6; }}
+    </style>
+</head>
+<body>
+    <h2>Search Error</h2>
+    <p>Sorry, we encountered an error while processing your search:</p>
+    <p><strong>{WebUtility.HtmlEncode(ex.Message)}</strong></p>
+    <p>Please try again with a different search query or check your network connection.</p>
+</body>
+</html>";
+                WebView.NavigateToString(errorHtml);
             }
         }
 
-        // Add this new method for generating the AI output HTML
+        // Add this parameter to your existing GenerateAIFormattedOutput method
+        private string GenerateAIFormattedOutput(string query, string aiResponse, List<string> keypoints, List<string> keywords, bool aiSucceeded = true)
+        {
+            var cleanKeypoints = keypoints.Count > 0 ? keypoints : ExtractBulletPoints(aiResponse);
+            var cleanKeywords = keywords.Count > 0 ? keywords : ExtractKeywords(aiResponse).Take(8).ToList();
+
+            var contentHtml = new System.Text.StringBuilder();
+
+            contentHtml.Append($@"
+        <div class='source-section'>
+            <h3>{(aiSucceeded ? "Gemma AI Analysis" : "Search Results")}</h3>
+            <div class='keywords'>
+                <h4>Kernpunkte:</h4>
+                <ul>
+                    {string.Join("\n", cleanKeypoints
+                                                            .Take(5)
+                                                            .Select(point => $"<li>{WebUtility.HtmlEncode(point)}</li>"))}
+                </ul>
+            </div>
+            <div class='keywords'>
+                <h4>Schlüsselwörter:</h4>
+                <div class='keyword-tags'>{string.Join(" ", cleanKeywords.Take(8).Select(k => $"<span class='keyword'>{WebUtility.HtmlEncode(k)}</span>"))}</div>
+            </div>
+            <div class='content'>
+                <p>{WebUtility.HtmlEncode(aiResponse).Replace("\n", "<br />")}</p>
+            </div>
+        </div>
+    ");
+
+            return $@"
+<html>
+<head>
+    <style>
+        body {{ 
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            padding: 2em;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            color: #000000;
+        }}
+        h2 {{ 
+            color: #180102;
+            font-size: 1.5em;
+            margin-bottom: 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 2px solid #f0f0f0;
+        }}
+        h4 {{
+            color: #180102;
+            font-size: 1.1em;
+            margin: 1em 0 0.5em 0;
+        }}
+        .source-section {{
+            background: #f8f9fa;
+            padding: 1.5em;
+            border-radius: 8px;
+            margin-bottom: 1em;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        h3 {{
+            color: #180102;
+            font-size: 1.2em;
+            margin-bottom: 0.5em;
+        }}
+        .keywords {{
+            margin: 1em 0;
+            padding: 1em;
+            background: #fff;
+            border-radius: 4px;
+        }}
+        .keyword-tags {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5em;
+        }}
+        .keyword {{
+            background: #f0f0f0;
+            color: #000000;
+            padding: 0.3em 0.8em;
+            border-radius: 1em;
+            font-size: 0.9em;
+            border: 1px solid #d0d0d0;
+        }}
+        ul {{
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }}
+        li {{
+            margin: 0.3em 0;
+            color: #000000;
+        }}
+        p {{
+            color: #000000;
+            font-size: 1.1em;
+            line-height: 1.8;
+            margin-bottom: 1em;
+        }}
+        .ai-badge {{
+            display: inline-block;
+            background: {(aiSucceeded ? "#6200FF" : "#707070")};
+            color: white;
+            padding: 0.3em 0.8em;
+            border-radius: 1em;
+            font-size: 0.9em;
+            margin-left: 1em;
+            vertical-align: middle;
+        }}
+    </style>
+</head>
+<body>
+    <h2>Suchergebnisse für: {WebUtility.HtmlEncode(query)} <span class='ai-badge'>{(aiSucceeded ? "Gemma AI" : "Search Results")}</span></h2>
+    {contentHtml}
+</body>
+</html>";
+        }        // Add this new method for generating the AI output HTML
         private string GenerateAIFormattedOutput(string query, string aiResponse, List<string> keypoints, List<string> keywords)
         {
             var cleanKeypoints = keypoints.Count > 0 ? keypoints : ExtractBulletPoints(aiResponse);
